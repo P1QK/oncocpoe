@@ -59,6 +59,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:superadmin,admin,pharmacist')->prefix('pharmacist')->name('pharmacist.')->group(function () {
         Route::get('/', [PharmacistController::class, 'index'])->name('index');
         Route::get('/poll', [PharmacistController::class, 'poll'])->name('poll');
+        Route::get('/stickers', [PharmacistController::class, 'dailyStickers'])->name('stickers');
         Route::get('/order/{orId}', [PharmacistController::class, 'show'])->name('show');
         Route::post('/order/{orId}/confirm', [PharmacistController::class, 'confirm'])->name('confirm');
         Route::post('/order/{orId}/day-status', [PharmacistController::class, 'updateDayStatus'])->name('day-status');

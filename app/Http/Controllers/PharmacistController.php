@@ -291,4 +291,139 @@ class PharmacistController extends Controller
 
         return view('pharmacist.print-labels', compact('order', 'labels', 'filterDate', 'availableDates'));
     }
+
+    /**
+     * หน้าพิมพ์สติกเกอร์ยาเคมีบำบัดประจำวัน (รวมคนไข้ทุกรายตามวันที่ให้ยา เลือกพิมพ์รายคนไข้ / ทั้งหมดได้)
+     */
+    public function dailyStickers(Request $request)
+    {
+        $selectedDate = $request->query('date', today()->format('Y-m-d'));
+        $selectedOrId = $request->query('or_id', '');
+
+        // 1. ดึงรายการจาก onc_dayrecord ตามวันที่ให้ยา (or_daterec)
+        $dayRecords = OncDayRecord::with([
+            'orderHeader.ward',
+            'medication',
+            'unit',
+            'solution',
+            'route',
+            'timing',
+        ])
+            ->whereDate('or_daterec', $selectedDate)
+            ->orderBy('or_id')
+            ->orderBy('or_orderno')
+            ->get();
+
+        $existingOrIds = $dayRecords->pluck('or_id')->unique()->toArray();
+
+        // 2. ดึงรายการจาก order_d ที่อยู่ในช่วงวันที่ให้ยา (or_start <= selectedDate <= or_stop) แต่ยังไม่ได้กด Confirm แตกลง onc_dayrecord
+        $pendingOrders = OrderHeader::with([
+            'details.medication',
+            'details.unit',
+            'details.solution',
+            'details.route',
+            'details.timing',
+            'ward',
+        ])
+            ->whereNotIn('or_id', $existingOrIds)
+            ->whereHas('details', function ($q) use ($selectedDate) {
+                $q->whereDate('or_start', '<=', $selectedDate)
+                  ->whereDate('or_stop', '>=', $selectedDate);
+            })
+            ->orderBy('or_id')
+            ->get();
+
+        $allStickersOnDate = collect($dayRecords);
+
+        foreach ($pendingOrders as $order) {
+            foreach ($order->details as $d) {
+                $start = Carbon::parse($d->or_start ?: $order->or_date);
+                $stop  = Carbon::parse($d->or_stop ?: $start);
+                $target = Carbon::parse($selectedDate);
+
+                if ($target->betweenIncluded($start, $stop)) {
+                    $totalDays = $start->diffInDays($stop) + 1;
+                    $dayIdx = $start->diffInDays($target) + 1;
+
+                    $allStickersOnDate->push((object) [
+                        'or_id'        => $order->or_id,
+                        'or_medcode'   => $d->or_medcode,
+                        'or_meddose'   => $d->or_meddose,
+                        'or_medunit'   => $d->or_medunit,
+                        'or_soln'      => $d->or_soln,
+                        'or_solvol'    => $d->or_solvol,
+                        'or_medroute'  => $d->or_medroute,
+                        'or_medtime'   => $d->or_medtime,
+                        'or_orderno'   => $d->or_orderno,
+                        'or_daterec'   => $selectedDate,
+                        'or_start'     => $d->or_start,
+                        'or_stop'      => $d->or_stop,
+                        'or_working'   => $d->or_working,
+                        'or_totalvol'  => $d->or_totalvol,
+                        'or_text'      => "Day {$dayIdx}/{$totalDays}",
+                        'orderHeader'  => $order,
+                        'medication'   => $d->medication,
+                        'unit'         => $d->unit,
+                        'solution'     => $d->solution,
+                        'route'        => $d->route,
+                        'timing'       => $d->timing,
+                    ]);
+                }
+            }
+        }
+
+        // 3. จัดกลุ่มรายชื่อคนไข้ทั้งหมดที่มีคิวรับยาในวันที่เลือก (เพิ่มสติกเกอร์สรุปรายการยาประจำวันอีก 1 ดวงต่อคนไข้)
+        $patientsGroup = $allStickersOnDate->groupBy('or_id')->map(function ($items, $orId) {
+            $first = $items->first();
+            $header = $first->orderHeader;
+            return (object) [
+                'or_id'          => $orId,
+                'or_hn'          => optional($header)->or_hn ?? '-',
+                'or_patname'     => optional($header)->or_patname ?? '-',
+                'or_reg_code'    => optional($header)->or_reg_code ?? '-',
+                'or_confirm'     => optional($header)->or_confirm ?? 0,
+                'ward_name'      => optional(optional($header)->ward)->wd_name ?? optional($header)->or_ward ?? '-',
+                'doses_count'    => $items->count(),
+                'stickers_count' => $items->count() + 1, // ยารายขวด + 1 ดวงสรุปรายการยาประจำวัน
+                'orderHeader'    => $header,
+                'items'          => $items->values(),
+            ];
+        });
+
+        // 4. กรองรายการสติกเกอร์ที่จะแสดงผล (ทั้งหมด หรือ เฉพาะคนไข้ที่เลือก)
+        $stickers = $selectedOrId
+            ? $allStickersOnDate->where('or_id', $selectedOrId)->values()
+            : $allStickersOnDate->values();
+
+        // 5. รวบรวมวันที่ที่มีรายการยาเพื่อแสดงปุ่มเลือกวันที่ด่วน
+        $datesFromDayRecord = OncDayRecord::select('or_daterec')
+            ->distinct()
+            ->orderBy('or_daterec')
+            ->pluck('or_daterec');
+
+        $datesFromOrderD = DB::table('order_d')
+            ->select('or_start', 'or_stop')
+            ->whereNotNull('or_start')
+            ->get();
+
+        $dateSet = collect($datesFromDayRecord);
+        foreach ($datesFromOrderD as $od) {
+            $s = Carbon::parse($od->or_start);
+            $e = Carbon::parse($od->or_stop ?: $od->or_start);
+            while ($s->lte($e)) {
+                $dateSet->push($s->format('Y-m-d'));
+                $s->addDay();
+            }
+        }
+        $activeDates = $dateSet->unique()->sort()->values();
+
+        return view('pharmacist.daily-stickers', compact(
+            'selectedDate',
+            'selectedOrId',
+            'patientsGroup',
+            'stickers',
+            'allStickersOnDate',
+            'activeDates'
+        ));
+    }
 }

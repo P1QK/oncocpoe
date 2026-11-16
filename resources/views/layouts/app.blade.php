@@ -81,8 +81,13 @@
 
                     @if(auth()->user()->canAccessPharmacist())
                         <li class="nav-item">
-                            <a class="nav-link nav-pill-role {{ request()->routeIs('pharmacist.*') ? 'active' : '' }}" href="{{ route('pharmacist.index') }}">
+                            <a class="nav-link nav-pill-role {{ request()->routeIs('pharmacist.index') || request()->routeIs('pharmacist.show') ? 'active' : '' }}" href="{{ route('pharmacist.index') }}">
                                 <i class="bi bi-capsule-pill me-1"></i> ระบบเภสัชกร (รับคำสั่ง/เตรียมยา)
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link nav-pill-role {{ request()->routeIs('pharmacist.stickers') ? 'active' : '' }}" href="{{ route('pharmacist.stickers') }}">
+                                <i class="bi bi-tags-fill me-1"></i> พิมพ์สติกเกอร์ยารายวัน
                             </a>
                         </li>
                     @endif

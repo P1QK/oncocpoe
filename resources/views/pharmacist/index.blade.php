@@ -12,7 +12,10 @@
             ระบบตรวจสอบคำสั่งใหม่แบบ Real-time อัตโนมัติ ยืนยันรับคำสั่ง แตกคำสั่งรายวัน และพิมพ์ใบจัดยา (A5 แนวนอน) / ฉลากยา
         </small>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{{ route('pharmacist.stickers') }}" class="btn btn-primary fw-semibold shadow-sm">
+            <i class="bi bi-tags-fill me-1"></i> พิมพ์สติกเกอร์ตามวันที่ให้ยา (รวมทุกผู้ป่วย)
+        </a>
         <span class="badge bg-success-subtle text-success border border-success px-3 py-2 d-flex align-items-center gap-2">
             <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
             <span>Auto-Refresh Real-time (<span id="lastCheckTime">{{ now()->format('H:i:s') }}</span>)</span>
