@@ -1,0 +1,952 @@
+@extends('layouts.app')
+
+@section('title', 'สั่งใช้ยาเคมีบำบัดใหม่ - ระบบแพทย์')
+
+@section('css_before')
+<style>
+    .calc-panel {
+        background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+        border: 2px solid #93c5fd;
+        border-radius: 12px;
+    }
+    .reduce-panel {
+        background: #fffbeb;
+        border: 2px solid #fcd34d;
+        border-radius: 12px;
+    }
+    .dose-highlight {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #b91c1c;
+        background-color: #fef2f2;
+        border: 2px solid #fca5a5;
+    }
+</style>
+@endsection
+
+@section('content')
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold text-primary mb-0">
+            <i class="bi bi-file-earmark-medical-fill me-2"></i>สร้างคำสั่งใช้ยาเคมีบำบัดชนิดฉีด (Chemotherapy Order)
+        </h4>
+        <small class="text-secondary">ขั้นตอน: 1. กรอกข้อมูลผู้ป่วยและผล Lab &rarr; 2. เลือกสูตร Regimen &rarr; 3. ตรวจสอบ/ปรับลดขนาดยา (%) และระบุเหตุผล</small>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-info text-dark fw-semibold" onclick="fillDemoPatient()">
+            <i class="bi bi-magic me-1"></i> กรอกข้อมูลผู้ป่วยตัวอย่างอัตโนมัติ
+        </button>
+        <a href="{{ route('doctor.index') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> กลับหน้ารายการ
+        </a>
+    </div>
+</div>
+
+<form method="POST" action="{{ route('doctor.store') }}" id="chemoOrderForm">
+    @csrf
+
+    <!-- STEP 1: ข้อมูลผู้ป่วย และ การคำนวณ BSA / GFR -->
+    <div class="card card-medical bg-white mb-4">
+        <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold"><i class="bi bi-person-vcard-fill me-2"></i>ส่วนที่ 1: ข้อมูลผู้ป่วยและผลตรวจทางห้องปฏิบัติการ (คำนวณ BSA &amp; GFR)</span>
+            <span class="badge bg-white text-primary">กรอกข้อมูลผู้ป่วยโดยตรง</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">HN <span class="text-danger">*</span></label>
+                    <input type="text" name="or_hn" id="or_hn" class="form-control fw-bold" value="{{ old('or_hn') }}" placeholder="เช่น 6701234" maxlength="10" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small">ชื่อ-นามสกุลผู้ป่วย <span class="text-danger">*</span></label>
+                    <input type="text" name="or_patname" id="or_patname" class="form-control" value="{{ old('or_patname') }}" placeholder="ระบุคำนำหน้า ชื่อ-นามสกุล" required>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label fw-semibold small">อายุ (ปี) <span class="text-danger">*</span></label>
+                    <input type="number" name="or_age" id="or_age" class="form-control calc-trigger" value="{{ old('or_age', 55) }}" min="1" max="120" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">เพศ <span class="text-danger">*</span></label>
+                    <select name="or_sex" id="or_sex" class="form-select calc-trigger" required>
+                        <option value="M" {{ old('or_sex') === 'M' ? 'selected' : '' }}>ชาย (Male)</option>
+                        <option value="F" {{ old('or_sex') === 'F' ? 'selected' : '' }}>หญิง (Female)</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small">หอผู้ป่วย / หน่วยงาน <span class="text-danger">*</span></label>
+                    <select name="or_ward" id="or_ward" class="form-select" required>
+                        @foreach($wards as $w)
+                            <option value="{{ $w->wd_code }}" {{ old('or_ward') == $w->wd_code ? 'selected' : '' }}>
+                                [{{ $w->wd_code }}] {{ $w->wd_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- แถวที่ 2: น้ำหนัก ส่วนสูง Serum Creatinine วันเริ่มยา และผลลัพธ์ BSA / GFR -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">น้ำหนัก (Weight, kg) <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="number" step="0.1" name="or_wt" id="or_wt" class="form-control fw-bold text-primary calc-trigger" value="{{ old('or_wt', 60.0) }}" min="1" max="300" required>
+                        <span class="input-group-text small">kg</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">ส่วนสูง (Height, cm) <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="number" step="0.1" name="or_ht" id="or_ht" class="form-control fw-bold text-primary calc-trigger" value="{{ old('or_ht', 165.0) }}" min="30" max="250" required>
+                        <span class="input-group-text small">cm</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">Serum Cr ล่าสุด <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="number" step="0.01" name="or_scr" id="or_scr" class="form-control fw-bold text-danger calc-trigger" value="{{ old('or_scr', 0.95) }}" min="0.1" max="30" required>
+                        <span class="input-group-text small">mg/dL</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small">วันที่เริ่มให้ยา (Day 1) <span class="text-danger">*</span></label>
+                    <input type="date" name="or_date" id="or_date" class="form-control calc-trigger" value="{{ old('or_date', date('Y-m-d')) }}" required>
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label fw-semibold small">Cycle ที่</label>
+                    <input type="number" name="or_cycle" id="or_cycle" class="form-control" value="{{ old('or_cycle', 1) }}" min="1" max="99" required>
+                </div>
+
+                <!-- กล่องแสดงผลคำนวณ BSA และ GFR อัตโนมัติ -->
+                <div class="col-md-3">
+                    <div class="calc-panel p-2 px-3 h-100 d-flex align-items-center justify-content-around">
+                        <div class="text-center">
+                            <div class="small fw-semibold text-primary">BSA (Mosteller)</div>
+                            <div class="fs-4 fw-bold text-dark"><span id="bsaDisplay">1.66</span> <small class="fs-6">m&sup2;</small></div>
+                            <input type="hidden" name="or_bsa" id="or_bsa" value="{{ old('or_bsa', 1.66) }}">
+                        </div>
+                        <div class="border-start border-primary-subtle h-75"></div>
+                        <div class="text-center">
+                            <div class="small fw-semibold text-primary">GFR (Cockcroft)</div>
+                            <div class="fs-4 fw-bold text-success"><span id="gfrDisplay">74.6</span> <small class="fs-6">mL/m</small></div>
+                            <input type="hidden" name="or_gfr" id="or_gfr" value="{{ old('or_gfr', 74.6) }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 2: เลือก Regimen และ ปรับลดขนาดยา (%) -->
+    <div class="card card-medical bg-white mb-4">
+        <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold"><i class="bi bi-prescription2 me-2"></i>ส่วนที่ 2: เลือกสูตรยาเคมีบำบัด (Regimen) และปรับลดขนาดยา (% Dose Reduction)</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 align-items-end mb-4">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-primary mb-1">
+                        1. ค้นหาและเลือกสูตรยาเคมีบำบัด (Regimen) <span class="text-danger">*</span>
+                    </label>
+
+                    <!-- ช่องข้อความสำหรับพิมพ์ค้นหาสูตรยา หรือ ชื่อยาในสูตร -->
+                    <div class="position-relative mb-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-primary text-white"><i class="bi bi-search"></i></span>
+                            <input type="text" id="regimenSearchInput" class="form-control border-primary"
+                                placeholder="พิมพ์ค้นหาชื่อสูตรยา (เช่น FOLFOX, AC) หรือชื่อยา (เช่น 5FU, Carbo)..."
+                                autocomplete="off"
+                                oninput="filterRegimenOptions(this.value)"
+                                onfocus="filterRegimenOptions(this.value)">
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearRegimenSearch()" title="ล้างคำค้นหา">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <!-- กล่องแสดงผลการค้นหาด่วน (Autocomplete Dropdown) -->
+                        <div id="regimenSearchResults" class="list-group position-absolute w-100 shadow-lg z-3 mt-1" style="display: none; max-height: 240px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Dropdown เลือกสูตรยา (ถูกกรองตามคำค้นหาอัตโนมัติ) -->
+                    <select id="regimenSelect" class="form-select border-primary fw-bold" onchange="onRegimenChange()">
+                        <option value="">-- กรุณาเลือกสูตรยาเคมีบำบัด (Select Regimen) --</option>
+                        @foreach($regimens as $reg)
+                            @php
+                                $drugCodes = $reg->details->pluck('rd_medcode')->unique()->implode(', ');
+                                $drugNames = $reg->details->map(fn($d) => optional($d->medication)->dg_name)->filter()->unique()->implode(' ');
+                            @endphp
+                            <option value="{{ $reg->rh_id }}"
+                                data-code="{{ $reg->rh_code }}"
+                                data-drugs="{{ $drugCodes }}"
+                                data-search="{{ strtolower($reg->rh_code . ' ' . $drugCodes . ' ' . $drugNames) }}">
+                                {{ $reg->rh_code }} ({{ $reg->details->count() }} รายการยา: {{ $drugCodes }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <input type="hidden" name="or_reg_code" id="or_reg_code" value="{{ old('or_reg_code') }}">
+                </div>
+
+                <!-- แผงควบคุมการปรับลดขนาดยา (%) และ Dose Banding / Rounding -->
+                <div class="col-md-7">
+                    <div class="reduce-panel p-3">
+                        <div class="row g-2 align-items-center mb-2 pb-2 border-bottom border-warning-subtle">
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-dark mb-1">
+                                    <i class="bi bi-sliders me-1 text-warning"></i>2. ปรับลดขนาดยา (% Reduction):
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-warning-subtle fw-bold">ลดลง</span>
+                                    <input type="number" step="1" min="0" max="90" name="or_adjust_percent" id="globalReducePct" class="form-control fw-bold text-danger fs-6 text-center" value="{{ old('or_adjust_percent', 0) }}" oninput="applyGlobalReduction(this.value)">
+                                    <span class="input-group-text bg-warning-subtle fw-bold">%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-7">
+                                <div class="small fw-semibold text-secondary mb-1">ปุ่มลัดปรับลดขนาดยา:</div>
+                                <div class="d-flex flex-wrap gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary fw-bold py-0 px-2" onclick="setGlobalReduction(0)">0% (Full)</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(10)">-10%</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(15)">-15%</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(20)">-20%</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(25)">-25%</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(30)">-30%</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(50)">-50%</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- แผงควบคุม Dose Banding / Dose Rounding -->
+                        <div class="row g-2 align-items-center">
+                            <div class="col-md-7">
+                                <label class="form-label fw-bold text-primary mb-1 small">
+                                    <i class="bi bi-Bullseye me-1"></i>3. รูปแบบการปัดขนาดยา (Dose Banding / Rounding):
+                                </label>
+                                <select id="roundingModeSelect" class="form-select form-select-sm border-primary fw-semibold" onchange="recalculateAllRows()">
+                                    <option value="clinical_band" selected>Clinical Dose Banding (ปัดตามมาตรฐานตัวยา ภายใน &plusmn;5%)</option>
+                                    <option value="syringe_05">Syringe Volume 0.5 mL (ปัดให้ดูดยาลงตัวทุก 0.5 mL)</option>
+                                    <option value="syringe_02">Syringe Volume 0.2 mL (ปัดให้ดูดยาลงตัวทุก 0.2 mL)</option>
+                                    <option value="int_5">Round to 5 mg (ปัดเป็นจำนวนเต็มทีละ 5 mg)</option>
+                                    <option value="int_1">Round to 1 mg (ปัดเป็นจำนวนเต็ม 1 mg)</option>
+                                    <option value="exact">Exact Dose (ไม่ปัดเศษ ใช้ค่าทศนิยมตามจริง)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-secondary mb-1 small">ทิศทางการปัด (Direction):</label>
+                                <select id="roundingDirSelect" class="form-select form-select-sm" onchange="recalculateAllRows()">
+                                    <option value="nearest" selected>ปัดใกล้เคียงที่สุด (&plusmn; Nearest Band)</option>
+                                    <option value="down">ปัดลงเท่านั้น (Round Down / Cap)</option>
+                                    <option value="up">ปัดขึ้น (Round Up)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กล่องระบุเหตุผลในการปรับลดขนาดยา (แสดงเด่นชัดและบังคับกรอกเมื่อมีการลดขนาดยา) -->
+            <div id="reasonBox" class="mb-4 p-3 rounded-3 border border-2 border-danger bg-danger-subtle" style="display: none;">
+                <div class="row g-2 align-items-center">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-danger mb-1">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>เหตุผลที่แพทย์ปรับลดขนาดยา (บันทึกลงตาราง <code>order_h.or_adjust_reason</code>) <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" name="or_adjust_reason" id="or_adjust_reason" class="form-control border-danger fw-semibold" value="{{ old('or_adjust_reason') }}" placeholder="ระบุเหตุผลทางคลินิกที่ปรับลดขนาดยา เช่น Neutropenia Gr.3, ค่าการทำงานของไตลดลง (CrCl ต่ำ), Poor ECOG Performance Status...">
+                        <div class="mt-2 d-flex flex-wrap gap-1 align-items-center">
+                            <span class="small text-secondary me-1">เลือกเหตุผลด่วน:</span>
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0" onclick="setReason('ภาวะเม็ดเลือดขาวต่ำ (Febrile / Grade 3-4 Neutropenia)')">เม็ดเลือดขาวต่ำ (Neutropenia)</button>
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0" onclick="setReason('การทำงานของไตลดลง (Renal Impairment / Low GFR)')">ค่าไตลดลง (Low GFR)</button>
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0" onclick="setReason('ผู้ป่วยสูงอายุ / สภาพร่างกายอ่อนเพลีย (ECOG >= 2)')">ผู้ป่วยสูงอายุ / ECOG &ge; 2</button>
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0" onclick="setReason('ภาวะเกล็ดเลือดต่ำ (Thrombocytopenia)')">เกล็ดเลือดต่ำ</button>
+                            <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0" onclick="setReason('ภาวะพิษต่อระบบประสาทส่วนปลาย (Peripheral Neuropathy)')">ปลายประสาทอักเสบ (Neuropathy)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ตารางรายการยาในสูตร Regimen และการคำนวณขนาดยา -->
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0" id="medItemsTable">
+                    <thead class="table-dark text-center small">
+                        <tr>
+                            <th style="width: 45px;">ลำดับ</th>
+                            <th style="min-width: 190px;">รหัสยา / ชื่อยาเคมีบำบัด</th>
+                            <th style="width: 120px;">ขนาดยาเริ่มต้น<br>(ตาม Regimen)</th>
+                            <th style="width: 130px;">ขนาดยาคำนวณ<br>(คูณ BSA/GFR)</th>
+                            <th style="width: 105px;">ปรับลด (%)</th>
+                            <th style="width: 145px;" class="bg-danger">ขนาดยาใหม่ที่ให้จริง<br>(Final Dose, mg)</th>
+                            <th style="min-width: 150px;">สารน้ำ (Diluent)</th>
+                            <th style="width: 110px;">ปริมาตรสารน้ำ<br>(mL)</th>
+                            <th style="min-width: 140px;">วิถีทาง / เวลาให้ยา</th>
+                            <th style="width: 85px;">เริ่ม Day</th>
+                            <th style="width: 90px;">ให้กี่วัน<br>(reg_d)</th>
+                            <th style="width: 125px;">ช่วงวันที่ให้ยา<br>(Start - Stop)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="medItemsBody">
+                        <tr id="emptyRow">
+                            <td colspan="12" class="text-center py-5 text-secondary">
+                                <i class="bi bi-arrow-up-circle fs-2 d-block mb-2 text-primary"></i>
+                                กรุณาเลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน ระบบจะดึงรายการยาและคำนวณขนาดยากับค่า BSA / GFR ให้อัตโนมัติ
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="small text-secondary">
+                <i class="bi bi-info-circle me-1"></i> สูตรการคำนวณ: ยาหน่วย <code>mg/m2</code> = ขนาดยาเริ่มต้น &times; BSA | ยาหน่วย <code>AUC</code> (Carboplatin) = AUC &times; (GFR + 25)
+            </div>
+            <button type="submit" id="submitOrderBtn" class="btn btn-primary btn-lg fw-bold shadow" disabled>
+                <i class="bi bi-send-check-fill me-1"></i> ยืนยันและส่งคำสั่งใช้ยาไปยังเภสัชกร
+            </button>
+        </div>
+    </div>
+</form>
+@endsection
+
+@section('js_after')
+<script>
+    const REGIMENS_DATA = @json($regimensJson);
+    const SOLUTIONS_LIST = @json($solutions);
+    const ROUTES_LIST = @json($routes);
+    const TIMINGS_LIST = @json($timings);
+
+    let currentItems = [];
+
+    function calculateBsaAndGfr() {
+        const wt = parseFloat(document.getElementById('or_wt').value) || 0;
+        const ht = parseFloat(document.getElementById('or_ht').value) || 0;
+        const age = parseFloat(document.getElementById('or_age').value) || 0;
+        const sex = document.getElementById('or_sex').value;
+        const scr = parseFloat(document.getElementById('or_scr').value) || 0;
+
+        // 1. Mosteller BSA = sqrt((Ht * Wt) / 3600)
+        let bsa = 0;
+        if (wt > 0 && ht > 0) {
+            bsa = Math.sqrt((ht * wt) / 3600);
+        }
+        bsa = Math.round(bsa * 100) / 100;
+
+        // 2. Cockcroft-Gault GFR = (((140 - Age) * Wt) / (72 * SCr)) * (0.85 if Female)
+        let gfr = 0;
+        if (wt > 0 && age > 0 && scr > 0) {
+            gfr = ((140 - age) * wt) / (72 * scr);
+            if (sex === 'F') {
+                gfr = gfr * 0.85;
+            }
+        }
+        gfr = Math.round(gfr * 10) / 10;
+
+        document.getElementById('bsaDisplay').innerText = bsa.toFixed(2);
+        document.getElementById('or_bsa').value = bsa.toFixed(2);
+
+        document.getElementById('gfrDisplay').innerText = gfr.toFixed(1);
+        document.getElementById('or_gfr').value = gfr.toFixed(1);
+
+        recalculateAllRows();
+    }
+
+    function onRegimenChange() {
+        const select = document.getElementById('regimenSelect');
+        const rhId = select.value;
+        const selectedOption = select.options[select.selectedIndex];
+        const rhCode = selectedOption ? (selectedOption.getAttribute('data-code') || '') : '';
+
+        document.getElementById('or_reg_code').value = rhCode;
+
+        if (!rhId || !REGIMENS_DATA[rhId]) {
+            currentItems = [];
+            renderMedTable();
+            document.getElementById('submitOrderBtn').disabled = true;
+            return;
+        }
+
+        const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
+        const reg = REGIMENS_DATA[rhId];
+
+        currentItems = reg.items.map((item) => ({
+            medcode: item.rd_medcode,
+            dg_name: item.dg_name,
+            dg_conc: item.dg_conc,
+            dg_precaution: item.dg_precaution,
+            base_dose: item.rd_meddose,
+            medunit: item.rd_medunit,
+            un_unit: item.un_unit,
+            soln: item.rd_sol,
+            solvol: item.rd_solvol,
+            medroute: item.rd_medroute,
+            medtime: item.rd_medtime,
+            start_day: item.rd_start,
+            duration: item.rd_duration,
+            reduce_pct: globalReduce,
+            std_dose: 0,
+            final_dose: 0,
+        }));
+
+        renderMedTable();
+        recalculateAllRows();
+        document.getElementById('submitOrderBtn').disabled = false;
+    }
+
+    function renderMedTable() {
+        const tbody = document.getElementById('medItemsBody');
+        if (!currentItems.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="12" class="text-center py-5 text-secondary">
+                        <i class="bi bi-arrow-up-circle fs-2 d-block mb-2 text-primary"></i>
+                        กรุณาเลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        let html = '';
+        currentItems.forEach((item, idx) => {
+            const solOptions = SOLUTIONS_LIST.map(s =>
+                `<option value="${s.so_code}" ${s.so_code === item.soln ? 'selected' : ''}>${s.so_code} - ${s.so_name}</option>`
+            ).join('');
+
+            const routeOptions = ROUTES_LIST.map(r =>
+                `<option value="${r.rt_code}" ${r.rt_code === item.medroute ? 'selected' : ''}>${r.rt_name}</option>`
+            ).join('');
+
+            const timeOptions = TIMINGS_LIST.map(t =>
+                `<option value="${t.tm_code}" ${t.tm_code === item.medtime ? 'selected' : ''}>${t.tm_time}</option>`
+            ).join('');
+
+            html += `
+                <tr>
+                    <td class="text-center fw-bold">${idx + 1}</td>
+                    <td>
+                        <div class="fw-bold text-primary">[${item.medcode}] ${item.dg_name}</div>
+                        <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL</small>
+                        <input type="hidden" name="items[${idx}][medcode]" value="${item.medcode}">
+                        <input type="hidden" name="items[${idx}][medunit]" value="${item.medunit}">
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-secondary-subtle text-dark fs-6">${item.base_dose} ${item.un_unit}</span>
+                    </td>
+                    <td class="text-center">
+                        <div class="fw-bold text-dark fs-6" id="std_dose_text_${idx}">0.00 mg</div>
+                        <small class="text-secondary d-block" id="raw_reduced_text_${idx}"></small>
+                        <input type="hidden" name="items[${idx}][std_dose]" id="std_dose_input_${idx}" value="0">
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="1" min="0" max="90"
+                                name="items[${idx}][reduce_pct]"
+                                id="reduce_pct_${idx}"
+                                class="form-control text-center fw-bold text-danger"
+                                value="${item.reduce_pct}"
+                                oninput="onItemReduceChange(${idx}, this.value)">
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </td>
+                    <td style="min-width: 195px;">
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="0.01" min="0.01"
+                                name="items[${idx}][meddose]"
+                                id="final_dose_${idx}"
+                                class="form-control text-end dose-highlight"
+                                value="0.00"
+                                oninput="onFinalDoseManualChange(${idx}, this.value)" required>
+                            <span class="input-group-text fw-bold">mg</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <span id="band_badge_${idx}" class="badge bg-success-subtle text-success border" style="font-size: 0.7rem;">Exact</span>
+                            <small class="fw-semibold text-primary" id="draw_vol_text_${idx}">ดูดยา: 0.00 mL</small>
+                        </div>
+                        <div id="band_chips_${idx}" class="d-flex justify-content-end gap-1 mt-1 flex-wrap"></div>
+                    </td>
+                    <td>
+                        <select name="items[${idx}][soln]" class="form-select form-select-sm">
+                            ${solOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="1" min="0"
+                                name="items[${idx}][solvol]"
+                                id="solvol_${idx}"
+                                class="form-control text-end"
+                                value="${item.solvol}">
+                            <span class="input-group-text">mL</span>
+                        </div>
+                    </td>
+                    <td>
+                        <select name="items[${idx}][medroute]" class="form-select form-select-sm mb-1">
+                            ${routeOptions}
+                        </select>
+                        <select name="items[${idx}][medtime]" class="form-select form-select-sm">
+                            ${timeOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">D</span>
+                            <input type="number" min="1" max="30"
+                                name="items[${idx}][start_day]"
+                                id="start_day_${idx}"
+                                class="form-control text-center"
+                                value="${item.start_day}"
+                                oninput="updateDateRangeDisplay(${idx})">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <input type="number" min="1" max="30"
+                                name="items[${idx}][duration]"
+                                id="duration_${idx}"
+                                class="form-control text-center fw-bold text-primary"
+                                value="${item.duration}"
+                                oninput="updateDateRangeDisplay(${idx})">
+                            <span class="input-group-text">วัน</span>
+                        </div>
+                    </td>
+                    <td class="text-center small">
+                        <div class="fw-semibold text-dark" id="date_range_${idx}">-</div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    // ตารางกำหนด Clinical Dose Banding Step มาตรฐานตามรหัสยา (mg)
+    const CLINICAL_BAND_STEPS = {
+        '5FU':   25,  // 50 mg/mL -> 25 mg = 0.5 mL
+        'LV':    10,  // 10 mg/mL -> 10 mg = 1.0 mL
+        'OXAL':  5,   // 5 mg/mL  -> 5 mg  = 1.0 mL
+        'DOXO':  2,   // 2 mg/mL  -> 2 mg  = 1.0 mL
+        'CYCLO': 10,  // 20 mg/mL -> 10 mg = 0.5 mL
+        'PACLI': 3,   // 6 mg/mL  -> 3 mg  = 0.5 mL
+        'CARBO': 10,  // 10 mg/mL -> 10 mg = 1.0 mL
+        'CISPL': 5,   // 1 mg/mL  -> 5 mg  = 5.0 mL
+        'GEMCI': 20,  // 38 mg/mL -> 20 mg
+        'IRIN':  10,  // 20 mg/mL -> 10 mg = 0.5 mL
+    };
+
+    function getBandStepForItem(item, rawDose) {
+        const modeEl = document.getElementById('roundingModeSelect');
+        const mode = modeEl ? modeEl.value : 'clinical_band';
+        const conc = item.dg_conc > 0 ? item.dg_conc : 1;
+
+        if (mode === 'exact' || rawDose <= 0) {
+            return 0;
+        }
+        if (mode === 'syringe_05') {
+            return Math.round(conc * 0.5 * 100) / 100;
+        }
+        if (mode === 'syringe_02') {
+            return Math.round(conc * 0.2 * 100) / 100;
+        }
+        if (mode === 'int_5') {
+            return 5;
+        }
+        if (mode === 'int_1') {
+            return 1;
+        }
+
+        // Default: clinical_band (ควบคุมความคลาดเคลื่อนไม่ให้เกิน ±5% ของขนาดยา)
+        let step = CLINICAL_BAND_STEPS[item.medcode] || (rawDose >= 500 ? 25 : (rawDose >= 100 ? 5 : 1));
+        const fallbackSteps = [25, 10, 5, 2, 1, 0.5];
+        if ((step / 2) > (rawDose * 0.05)) {
+            for (const s of fallbackSteps) {
+                if ((s / 2) <= (rawDose * 0.05)) {
+                    step = s;
+                    break;
+                }
+            }
+        }
+        return step;
+    }
+
+    function applyDoseBanding(rawDose, step) {
+        if (!step || step <= 0 || rawDose <= 0) {
+            return Math.round(rawDose * 100) / 100;
+        }
+        const dirEl = document.getElementById('roundingDirSelect');
+        const dir = dirEl ? dirEl.value : 'nearest';
+
+        let banded = rawDose;
+        if (dir === 'down') {
+            banded = Math.floor((rawDose + 1e-9) / step) * step;
+        } else if (dir === 'up') {
+            banded = Math.ceil((rawDose - 1e-9) / step) * step;
+        } else {
+            banded = Math.round(rawDose / step) * step;
+        }
+        if (banded <= 0) banded = step;
+        return Math.round(banded * 100) / 100;
+    }
+
+    function recalculateAllRows() {
+        const bsa = parseFloat(document.getElementById('or_bsa').value) || 1.0;
+        const gfr = parseFloat(document.getElementById('or_gfr').value) || 60.0;
+
+        currentItems.forEach((item, idx) => {
+            let stdDose = 0;
+            // Unit 04 = AUC (Calvert Formula: AUC * (GFR + 25))
+            if (item.medunit === '04' || (item.un_unit && item.un_unit.toUpperCase() === 'AUC')) {
+                stdDose = item.base_dose * (gfr + 25);
+            } else if (item.medunit === '03' || (item.un_unit && item.un_unit.includes('m2'))) {
+                stdDose = item.base_dose * bsa;
+            } else {
+                stdDose = item.base_dose * bsa;
+            }
+
+            stdDose = Math.round(stdDose * 100) / 100;
+            item.std_dose = stdDose;
+
+            const reduceInput = document.getElementById(`reduce_pct_${idx}`);
+            const reducePct = reduceInput ? (parseFloat(reduceInput.value) || 0) : item.reduce_pct;
+
+            const rawReducedDose = Math.round(stdDose * (1 - reducePct / 100) * 100) / 100;
+            item.raw_reduced_dose = rawReducedDose;
+
+            const step = getBandStepForItem(item, rawReducedDose);
+            item.band_step = step;
+            const finalDose = applyDoseBanding(rawReducedDose, step);
+            item.final_dose = finalDose;
+
+            const stdTextEl = document.getElementById(`std_dose_text_${idx}`);
+            const rawReducedEl = document.getElementById(`raw_reduced_text_${idx}`);
+            const stdInputEl = document.getElementById(`std_dose_input_${idx}`);
+            const finalInputEl = document.getElementById(`final_dose_${idx}`);
+
+            if (stdTextEl) stdTextEl.innerText = stdDose.toFixed(2) + ' mg';
+            if (rawReducedEl) {
+                rawReducedEl.innerText = reducePct > 0
+                    ? `หลังลด ${reducePct}%: ${rawReducedDose.toFixed(2)} mg`
+                    : `ก่อนปัด: ${rawReducedDose.toFixed(2)} mg`;
+            }
+            if (stdInputEl) stdInputEl.value = stdDose.toFixed(2);
+            if (finalInputEl) finalInputEl.value = finalDose.toFixed(2);
+
+            updateBandingUI(idx, rawReducedDose, finalDose, step, item.dg_conc);
+            updateDateRangeDisplay(idx);
+        });
+
+        toggleReasonBoxVisibility();
+    }
+
+    function updateBandingUI(idx, rawDose, finalDose, step, conc) {
+        updateDrawVolumeDisplay(idx, finalDose, conc);
+
+        const badgeEl = document.getElementById(`band_badge_${idx}`);
+        const chipsEl = document.getElementById(`band_chips_${idx}`);
+
+        if (badgeEl) {
+            if (rawDose > 0) {
+                const diffPct = ((finalDose - rawDose) / rawDose) * 100;
+                const sign = diffPct > 0 ? '+' : '';
+                const absDiff = Math.abs(diffPct);
+
+                if (absDiff < 0.01) {
+                    badgeEl.className = 'badge bg-secondary-subtle text-secondary border';
+                    badgeEl.innerText = 'Exact (0.0%)';
+                } else if (absDiff <= 5.0) {
+                    badgeEl.className = 'badge bg-success-subtle text-success border border-success';
+                    badgeEl.innerText = `Band: ${sign}${diffPct.toFixed(1)}% (ในเกณฑ์ ±5%)`;
+                } else {
+                    badgeEl.className = 'badge bg-warning-subtle text-danger border border-danger';
+                    badgeEl.innerText = `ต่าง ${sign}${diffPct.toFixed(1)}% (>5%)`;
+                }
+            }
+        }
+
+        if (chipsEl) {
+            if (!step || step <= 0 || rawDose <= 0) {
+                chipsEl.innerHTML = '';
+                return;
+            }
+            const lower = Math.max(step, Math.floor(rawDose / step) * step);
+            const nearest = Math.max(step, Math.round(rawDose / step) * step);
+            const upper = Math.ceil(rawDose / step) * step;
+            const candidates = Array.from(new Set([
+                Math.round((nearest - step) * 100) / 100,
+                Math.round(lower * 100) / 100,
+                Math.round(nearest * 100) / 100,
+                Math.round(upper * 100) / 100,
+            ])).filter(v => v > 0).slice(0, 3);
+
+            chipsEl.innerHTML = `<span class="text-muted" style="font-size:0.68rem;">Band:</span>` + candidates.map(val => {
+                const isSelected = Math.abs(val - finalDose) < 0.01;
+                const btnClass = isSelected ? 'btn-danger' : 'btn-outline-secondary';
+                return `<button type="button" class="btn ${btnClass} py-0 px-1" style="font-size: 0.68rem;" onclick="selectBandValue(${idx}, ${val})">${val}</button>`;
+            }).join('');
+        }
+    }
+
+    function selectBandValue(idx, val) {
+        const finalInputEl = document.getElementById(`final_dose_${idx}`);
+        if (finalInputEl) {
+            finalInputEl.value = parseFloat(val).toFixed(2);
+            onFinalDoseManualChange(idx, val);
+        }
+    }
+
+    function updateDrawVolumeDisplay(idx, finalDose, conc) {
+        const drawEl = document.getElementById(`draw_vol_text_${idx}`);
+        if (!drawEl) return;
+        const drawVol = conc > 0 ? (finalDose / conc) : 0;
+        drawEl.innerText = `ดูดยา: ${drawVol.toFixed(2)} mL`;
+    }
+
+    function updateDateRangeDisplay(idx) {
+        const baseDateStr = document.getElementById('or_date').value;
+        const startDayEl = document.getElementById(`start_day_${idx}`);
+        const durationEl = document.getElementById(`duration_${idx}`);
+        const rangeEl = document.getElementById(`date_range_${idx}`);
+
+        if (!baseDateStr || !startDayEl || !durationEl || !rangeEl) return;
+
+        const startDay = Math.max(1, parseInt(startDayEl.value) || 1);
+        const duration = Math.max(1, parseInt(durationEl.value) || 1);
+
+        const startDate = new Date(baseDateStr);
+        startDate.setDate(startDate.getDate() + (startDay - 1));
+
+        const stopDate = new Date(startDate);
+        stopDate.setDate(stopDate.getDate() + (duration - 1));
+
+        const fmt = (d) => d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short' });
+        rangeEl.innerHTML = `<span class="badge bg-info-subtle text-dark border">${fmt(startDate)} - ${fmt(stopDate)}</span>`;
+    }
+
+    function setGlobalReduction(pct) {
+        document.getElementById('globalReducePct').value = pct;
+        applyGlobalReduction(pct);
+    }
+
+    function applyGlobalReduction(pct) {
+        const cleanPct = Math.min(90, Math.max(0, parseFloat(pct) || 0));
+        currentItems.forEach((item, idx) => {
+            item.reduce_pct = cleanPct;
+            const el = document.getElementById(`reduce_pct_${idx}`);
+            if (el) el.value = cleanPct;
+        });
+        recalculateAllRows();
+    }
+
+    function onItemReduceChange(idx, val) {
+        const cleanPct = Math.min(90, Math.max(0, parseFloat(val) || 0));
+        if (currentItems[idx]) {
+            currentItems[idx].reduce_pct = cleanPct;
+            const stdDose = currentItems[idx].std_dose;
+            const rawReducedDose = Math.round(stdDose * (1 - cleanPct / 100) * 100) / 100;
+            currentItems[idx].raw_reduced_dose = rawReducedDose;
+
+            const step = getBandStepForItem(currentItems[idx], rawReducedDose);
+            currentItems[idx].band_step = step;
+            const finalDose = applyDoseBanding(rawReducedDose, step);
+            currentItems[idx].final_dose = finalDose;
+
+            const rawReducedEl = document.getElementById(`raw_reduced_text_${idx}`);
+            if (rawReducedEl) {
+                rawReducedEl.innerText = cleanPct > 0
+                    ? `หลังลด ${cleanPct}%: ${rawReducedDose.toFixed(2)} mg`
+                    : `ก่อนปัด: ${rawReducedDose.toFixed(2)} mg`;
+            }
+
+            document.getElementById(`final_dose_${idx}`).value = finalDose.toFixed(2);
+            updateBandingUI(idx, rawReducedDose, finalDose, step, currentItems[idx].dg_conc);
+        }
+        toggleReasonBoxVisibility();
+    }
+
+    function onFinalDoseManualChange(idx, val) {
+        const finalDose = parseFloat(val) || 0;
+        if (currentItems[idx]) {
+            currentItems[idx].final_dose = finalDose;
+            const rawDose = currentItems[idx].raw_reduced_dose || currentItems[idx].std_dose || finalDose;
+            const step = currentItems[idx].band_step || 0;
+            updateBandingUI(idx, rawDose, finalDose, step, currentItems[idx].dg_conc);
+        }
+    }
+
+    function toggleReasonBoxVisibility() {
+        const globalPct = parseFloat(document.getElementById('globalReducePct').value) || 0;
+        let maxItemPct = 0;
+        currentItems.forEach((item, idx) => {
+            const el = document.getElementById(`reduce_pct_${idx}`);
+            const p = el ? (parseFloat(el.value) || 0) : 0;
+            if (p > maxItemPct) maxItemPct = p;
+        });
+
+        const hasReduction = (globalPct > 0 || maxItemPct > 0);
+        const box = document.getElementById('reasonBox');
+        const reasonInput = document.getElementById('or_adjust_reason');
+
+        if (hasReduction) {
+            box.style.display = 'block';
+            reasonInput.required = true;
+        } else {
+            box.style.display = 'none';
+            reasonInput.required = false;
+        }
+    }
+
+    function setReason(text) {
+        const input = document.getElementById('or_adjust_reason');
+        input.value = text;
+        input.focus();
+    }
+
+    function fillDemoPatient() {
+        const demoPatients = [
+            { hn: '6708412', name: 'นาย วิชัย ใจสู้ดี', age: 62, sex: 'M', wt: 64.5, ht: 168, scr: 1.05, ward: '000' },
+            { hn: '6709105', name: 'นาง มาลี ศรีสุข', age: 54, sex: 'F', wt: 56.0, ht: 158, scr: 0.85, ward: '002' },
+            { hn: '6703329', name: 'นาย สมศักดิ์ รักษ์สุขภาพ', age: 68, sex: 'M', wt: 58.0, ht: 164, scr: 1.35, ward: '001' },
+        ];
+        const p = demoPatients[Math.floor(Math.random() * demoPatients.length)];
+        document.getElementById('or_hn').value = p.hn;
+        document.getElementById('or_patname').value = p.name;
+        document.getElementById('or_age').value = p.age;
+        document.getElementById('or_sex').value = p.sex;
+        document.getElementById('or_wt').value = p.wt;
+        document.getElementById('or_ht').value = p.ht;
+        document.getElementById('or_scr').value = p.scr;
+        document.getElementById('or_ward').value = p.ward;
+
+        calculateBsaAndGfr();
+
+        const regSelect = document.getElementById('regimenSelect');
+        if (!regSelect.value && regSelect.options.length > 1) {
+            regSelect.selectedIndex = 1;
+            onRegimenChange();
+        }
+    }
+
+    // เก็บรายการตัวเลือก Regimen ทั้งหมดไว้ใช้ค้นหาและกรอง
+    let allRegimenOptions = [];
+
+    function initRegimenSearch() {
+        const select = document.getElementById('regimenSelect');
+        allRegimenOptions = Array.from(select.options)
+            .filter(opt => opt.value !== '')
+            .map(opt => ({
+                value: opt.value,
+                text: opt.text,
+                code: opt.getAttribute('data-code') || '',
+                drugs: opt.getAttribute('data-drugs') || '',
+                search: (opt.getAttribute('data-search') || opt.text).toLowerCase(),
+            }));
+
+        const searchInput = document.getElementById('regimenSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const kw = this.value.trim().toLowerCase();
+                    const matched = allRegimenOptions.filter(o => o.search.includes(kw));
+                    if (matched.length > 0) {
+                        selectRegimenFromSearch(matched[0].value);
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            const box = document.getElementById('regimenSearchResults');
+            const input = document.getElementById('regimenSearchInput');
+            if (box && input && !box.contains(e.target) && e.target !== input) {
+                box.style.display = 'none';
+            }
+        });
+    }
+
+    function filterRegimenOptions(keyword) {
+        const kw = (keyword || '').trim().toLowerCase();
+        const select = document.getElementById('regimenSelect');
+        const resultsBox = document.getElementById('regimenSearchResults');
+        const currentVal = select.value;
+
+        const matched = kw === ''
+            ? allRegimenOptions
+            : allRegimenOptions.filter(o => o.search.includes(kw));
+
+        // 1. กรองตัวเลือกใน <select> ให้เหลือเฉพาะที่ตรงกับคำค้นหา
+        select.innerHTML = `<option value="">-- กรุณาเลือกสูตรยาเคมีบำบัด (พบ ${matched.length} สูตร) --</option>`;
+        matched.forEach(o => {
+            const opt = document.createElement('option');
+            opt.value = o.value;
+            opt.text = o.text;
+            opt.setAttribute('data-code', o.code);
+            opt.setAttribute('data-drugs', o.drugs);
+            opt.setAttribute('data-search', o.search);
+            if (o.value === currentVal) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+
+        // 2. แสดงรายการผลลัพธ์แบบ Autocomplete ให้คลิกเลือกได้ทันทีเมื่อพิมพ์ค้นหา
+        if (kw === '') {
+            resultsBox.style.display = 'none';
+            return;
+        }
+
+        if (matched.length === 0) {
+            resultsBox.innerHTML = `
+                <div class="list-group-item text-danger small py-2">
+                    <i class="bi bi-exclamation-circle me-1"></i> ไม่พบสูตรยาที่ตรงกับ "${keyword}"
+                </div>`;
+            resultsBox.style.display = 'block';
+            return;
+        }
+
+        resultsBox.innerHTML = matched.map(o => `
+            <button type="button" class="list-group-item list-group-item-action py-2 d-flex justify-content-between align-items-center"
+                onclick="selectRegimenFromSearch('${o.value}')">
+                <div>
+                    <div class="fw-bold text-primary">${o.code}</div>
+                    <small class="text-secondary"><i class="bi bi-capsule me-1"></i>ตัวยาในสูตร: ${o.drugs}</small>
+                </div>
+                <span class="badge bg-primary-subtle text-primary">คลิกเลือก</span>
+            </button>
+        `).join('');
+        resultsBox.style.display = 'block';
+    }
+
+    function selectRegimenFromSearch(rhId) {
+        const select = document.getElementById('regimenSelect');
+        const resultsBox = document.getElementById('regimenSearchResults');
+        const searchInput = document.getElementById('regimenSearchInput');
+
+        // คืนค่ารายการทั้งหมดใน select ก่อนแล้วเลือกค่าที่คลิก
+        filterRegimenOptions('');
+        select.value = rhId;
+
+        const chosen = allRegimenOptions.find(o => o.value === String(rhId));
+        if (chosen && searchInput) {
+            searchInput.value = chosen.code;
+        }
+        if (resultsBox) {
+            resultsBox.style.display = 'none';
+        }
+
+        onRegimenChange();
+    }
+
+    function clearRegimenSearch() {
+        const searchInput = document.getElementById('regimenSearchInput');
+        const resultsBox = document.getElementById('regimenSearchResults');
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        filterRegimenOptions('');
+        if (resultsBox) {
+            resultsBox.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initRegimenSearch();
+        document.querySelectorAll('.calc-trigger').forEach(el => {
+            el.addEventListener('input', calculateBsaAndGfr);
+            el.addEventListener('change', calculateBsaAndGfr);
+        });
+        calculateBsaAndGfr();
+    });
+</script>
+@endsection

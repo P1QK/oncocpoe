@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- White circular background with subtle border for crisp contrast in both dark and light mode -->
+  <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <!-- Medical Red Cross -->
+  <rect x="25" y="14" width="14" height="36" rx="3" fill="#dc2626"/>
+  <rect x="14" y="25" width="36" height="14" rx="3" fill="#dc2626"/>
+</svg>

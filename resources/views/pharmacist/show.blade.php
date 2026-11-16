@@ -1,0 +1,264 @@
+@extends('layouts.app')
+
+@section('title', 'ตรวจสอบคำสั่งและแตกวันให้ยา - ' . $order->or_id)
+
+@section('content')
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h4 class="fw-bold text-success mb-0">
+            <i class="bi bi-clipboard2-check-fill me-2"></i>ตรวจสอบคำสั่งใช้ยาเคมีบำบัด: {{ $order->or_id }}
+        </h4>
+        <small class="text-secondary">
+            แพทย์ผู้สั่ง: {{ $order->or_doctor_name ?? '-' }} | วันที่เริ่มให้ยา: {{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}
+        </small>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        @if($order->or_confirm == 0)
+            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}">
+                @csrf
+                <button type="submit" class="btn btn-success fw-bold shadow-sm">
+                    <i class="bi bi-check2-all me-1"></i> Confirm รับคำสั่งใช้ยา &amp; แตกคำสั่งรายวัน
+                </button>
+            </form>
+        @else
+            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" onsubmit="return confirm('ต้องการคำนวณและแตกคำสั่งรายวันใหม่อีกครั้งหรือไม่?');">
+                @csrf
+                <button type="submit" class="btn btn-outline-success">
+                    <i class="bi bi-arrow-repeat me-1"></i> แตกคำสั่งรายวันใหม่
+                </button>
+            </form>
+        @endif
+
+        <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold">
+            <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบจัดยา Working Formula (A5 แนวนอน)
+        </a>
+
+        <a href="{{ route('pharmacist.print.labels', $order->or_id) }}" target="_blank" class="btn btn-primary fw-semibold">
+            <i class="bi bi-tags-fill me-1"></i> พิมพ์ฉลากยาทั้งหมด
+        </a>
+
+        <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> กลับหน้าหลักเภสัชกร
+        </a>
+    </div>
+</div>
+
+<!-- ข้อมูลผู้ป่วยและสถานะ -->
+<div class="card card-medical bg-white mb-4">
+    <div class="card-body">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4 border-end">
+                <span class="badge bg-dark mb-1">HN: {{ $order->or_hn }}</span>
+                <h5 class="fw-bold mb-1">{{ $order->or_patname }}</h5>
+                <div class="small text-secondary">
+                    อายุ: {{ $order->or_age ?? '-' }} ปี | เพศ: {{ $order->or_sex === 'F' ? 'หญิง' : 'ชาย' }} |
+                    หอผู้ป่วย: <strong>{{ optional($order->ward)->wd_name ?? $order->or_ward }}</strong>
+                </div>
+            </div>
+            <div class="col-md-4 border-end">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="small text-muted">น้ำหนัก / ส่วนสูง</div>
+                        <div class="fw-bold">{{ number_format($order->or_wt, 1) }} kg / {{ number_format($order->or_ht, 0) }} cm</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">BSA</div>
+                        <div class="fw-bold text-primary fs-5">{{ number_format($order->or_bsa, 2) }} m&sup2;</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">GFR (SCr {{ $order->or_scr }})</div>
+                        <div class="fw-bold text-success fs-5">{{ number_format($order->or_gfr, 1) }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <div class="mb-2">
+                    <span class="badge bg-primary-subtle text-primary fs-6">
+                        สูตร Regimen: {{ $order->or_reg_code }} (Cycle #{{ $order->or_cycle ?? 1 }})
+                    </span>
+                </div>
+                @if($order->or_confirm == 1)
+                    <span class="badge bg-success px-3 py-2 fs-6">
+                        <i class="bi bi-check-circle-fill me-1"></i> สถานะ: รับคำสั่งแล้ว
+                    </span>
+                    <div class="small text-muted mt-1">
+                        ผู้ยืนยัน: {{ $order->or_pharmacist_name ?? '-' }}
+                    </div>
+                @else
+                    <span class="badge bg-danger px-3 py-2 fs-6">
+                        <i class="bi bi-exclamation-circle-fill me-1"></i> สถานะ: รอเภสัชกรกด Confirm รับคำสั่ง
+                    </span>
+                @endif
+            </div>
+        </div>
+
+        @if($order->or_adjust_percent > 0 || $order->or_adjust_reason)
+            <div class="alert alert-warning mt-3 mb-0 border-warning d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-danger"></i>
+                <div>
+                    <strong>แพทย์ปรับลดขนาดยาลง {{ number_format($order->or_adjust_percent, 0) }}%</strong> &mdash;
+                    <strong>เหตุผล:</strong> {{ $order->or_adjust_reason ?: '-' }}
+                </div>
+            </div>
+        @endif
+    </div>
+</div>
+
+<!-- ตารางที่ 1: รายการคำสั่งใช้ยาหลัก (order_d) -->
+<div class="card card-medical bg-white mb-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <span class="fw-bold"><i class="bi bi-prescription2 text-primary me-1"></i> 1. รายการยาตามคำสั่งแพทย์ (ตาราง <code>order_d</code>)</span>
+        <span class="badge bg-secondary">{{ $order->details->count() }} รายการยา</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th class="text-center">#</th>
+                    <th>รหัส / ชื่อยาเคมีบำบัด (ความเข้มข้น)</th>
+                    <th class="text-end">ขนาดยาสุทธิ (mg)</th>
+                    <th class="text-end bg-warning-subtle">ปริมาตรยาที่ดูด (mL)</th>
+                    <th>สารน้ำ &amp; ปริมาตรเริ่มต้น</th>
+                    <th class="text-end">ปริมาตรรวม (Total Vol)</th>
+                    <th>วิถีทาง / เวลาให้ยา</th>
+                    <th class="text-center">จำนวนวัน</th>
+                    <th class="text-center">ช่วงวันที่ให้ยา (or_start - or_stop)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($order->details as $d)
+                    @php
+                        $days = \Carbon\Carbon::parse($d->or_start)->diffInDays(\Carbon\Carbon::parse($d->or_stop)) + 1;
+                    @endphp
+                    <tr>
+                        <td class="text-center fw-bold">{{ $d->or_orderno }}</td>
+                        <td>
+                            <div class="fw-bold text-primary">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
+                            <small class="text-secondary">
+                                ความเข้มข้น: <strong>{{ number_format(optional($d->medication)->dg_conc ?? 1, 2) }} mg/mL</strong>
+                                @if(($d->or_reduce_pct ?? 0) > 0)
+                                    | <span class="text-danger fw-semibold">ลด {{ number_format($d->or_reduce_pct, 0) }}% จาก {{ number_format($d->or_std_dose, 2) }} mg</span>
+                                @endif
+                            </small>
+                        </td>
+                        <td class="text-end fw-bold text-danger fs-5">
+                            {{ number_format($d->or_meddose, 2) }} {{ optional($d->unit)->un_unit ?? 'mg' }}
+                        </td>
+                        <td class="text-end fw-bold bg-warning-subtle fs-5 text-dark">
+                            {{ number_format($d->or_working, 2) }} mL
+                        </td>
+                        <td>
+                            {{ optional($d->solution)->so_name ?? $d->or_soln }}
+                            <strong>{{ number_format($d->or_solvol, 0) }} mL</strong>
+                        </td>
+                        <td class="text-end fw-semibold">
+                            {{ number_format($d->or_totalvol, 2) }} mL
+                        </td>
+                        <td>
+                            <div>{{ optional($d->route)->rt_name ?? $d->or_medroute }}</div>
+                            <small class="text-primary fw-semibold">{{ optional($d->timing)->tm_time ?? $d->or_medtime }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-info text-dark fs-6">{{ $days }} วัน</span>
+                        </td>
+                        <td class="text-center fw-semibold">
+                            {{ \Carbon\Carbon::parse($d->or_start)->format('d/m/Y') }} &ndash; {{ \Carbon\Carbon::parse($d->or_stop)->format('d/m/Y') }}
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ตารางที่ 2: รายการแตกคำสั่งใช้ยาเป็นรายวัน (onc_dayrecord) -->
+<div class="card card-medical bg-white">
+    <div class="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-bold">
+            <i class="bi bi-calendar2-week-fill me-2"></i> 2. ตารางแตกคำสั่งใช้ยาเป็นรายวัน (ตาราง <code>onc_dayrecord</code>)
+        </span>
+        <span class="badge bg-white text-success">รวมทั้งหมด {{ $order->dayRecords->count() }} โดสรายวัน</span>
+    </div>
+    <div class="card-body">
+        @if($groupedDayRecords->isEmpty())
+            <div class="text-center py-4 text-secondary">
+                <i class="bi bi-exclamation-circle fs-2 d-block mb-2 text-warning"></i>
+                กรุณากดปุ่ม <strong>"Confirm รับคำสั่งใช้ยา &amp; แตกคำสั่งรายวัน"</strong> ด้านบน เพื่อให้ระบบนำข้อมูลจาก <code>order_d</code> มาแตกเป็นรายการยารายวันตามช่วงวันที่ <code>or_start</code> ถึง <code>or_stop</code>
+            </div>
+        @else
+            @foreach($groupedDayRecords as $dateStr => $records)
+                <div class="border rounded-3 mb-3 overflow-hidden">
+                    <div class="bg-light px-3 py-2 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="fw-bold text-dark">
+                            <i class="bi bi-calendar-event text-success me-1"></i>
+                            วันที่ให้ยา: <span class="text-primary">{{ \Carbon\Carbon::parse($dateStr)->format('d/m/Y') }}</span>
+                            <span class="badge bg-secondary ms-2">{{ $records->count() }} รายการยา</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('pharmacist.print.labels', ['orId' => $order->or_id, 'date' => $dateStr]) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-tag-fill me-1"></i> พิมพ์ฉลากยาเฉพาะวันนี้
+                            </a>
+                            <form method="POST" action="{{ route('pharmacist.day-status', $order->or_id) }}" class="d-inline">
+                                @csrf
+                                <input type="hidden" name="or_daterec" value="{{ $dateStr }}">
+                                <input type="hidden" name="action" value="prep">
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    <i class="bi bi-check2-square me-1"></i> ยืนยันเตรียมยาวันนี้เสร็จสิ้น
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th class="ps-3">ลำดับ</th>
+                                    <th>วันที่ให้ยา (or_daterec)</th>
+                                    <th>รายการยา</th>
+                                    <th class="text-end">ขนาดยา</th>
+                                    <th class="text-end">ดูดยา (Working)</th>
+                                    <th>สารน้ำ / ปริมาตรรวม</th>
+                                    <th>วิถีทาง / เวลา</th>
+                                    <th class="text-center">วันในคอร์ส</th>
+                                    <th class="text-center">สถานะเตรียมยา</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($records as $rec)
+                                    <tr>
+                                        <td class="ps-3 fw-bold">{{ $rec->or_orderno }}</td>
+                                        <td>{{ \Carbon\Carbon::parse($rec->or_daterec)->format('d/m/Y') }}</td>
+                                        <td class="fw-semibold text-primary">
+                                            [{{ $rec->or_medcode }}] {{ optional($rec->medication)->dg_name ?? $rec->or_medcode }}
+                                        </td>
+                                        <td class="text-end fw-bold text-danger">{{ number_format($rec->or_meddose, 2) }} mg</td>
+                                        <td class="text-end fw-bold">{{ number_format($rec->or_working, 2) }} mL</td>
+                                        <td>
+                                            {{ optional($rec->solution)->so_name ?? $rec->or_soln }} ({{ number_format($rec->or_solvol, 0) }} mL)
+                                            <small class="text-muted">รวม {{ number_format($rec->or_totalvol, 2) }} mL</small>
+                                        </td>
+                                        <td>
+                                            {{ optional($rec->route)->rt_name ?? $rec->or_medroute }} /
+                                            {{ optional($rec->timing)->tm_time ?? $rec->or_medtime }}
+                                        </td>
+                                        <td class="text-center"><span class="badge bg-light text-dark border">{{ $rec->or_text }}</span></td>
+                                        <td class="text-center">
+                                            @if($rec->or_send == 1)
+                                                <span class="badge bg-info text-dark">ส่งมอบ/บริหารยาแล้ว</span>
+                                            @elseif($rec->or_prep == 1)
+                                                <span class="badge bg-success">เตรียมยาแล้ว</span>
+                                            @else
+                                                <span class="badge bg-secondary">รับคำสั่งแล้ว (รอผสม)</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endforeach
+        @endif
+    </div>
+</div>
+@endsection
