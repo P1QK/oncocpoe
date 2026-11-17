@@ -165,7 +165,10 @@
 
                     <!-- Dropdown เลือกสูตรยา (ถูกกรองตามคำค้นหาอัตโนมัติ) -->
                     <select id="regimenSelect" class="form-select border-primary fw-bold" onchange="onRegimenChange()">
-                        <option value="">-- กรุณาเลือกสูตรยาเคมีบำบัด (Select Regimen) --</option>
+                        <option value="">-- กรุณาเลือกสูตรยา Regimen หรือกดปุ่มสั่งยาแบบอิสระ --</option>
+                        <option value="CUSTOM" data-code="CUSTOM" data-drugs="กำหนดตัวยาเองอย่างอิสระ" data-search="custom free สั่งยาอิสระ กำหนดเอง">
+                            ★ [CUSTOM] สั่งใช้ยาเคมีบำบัดแบบอิสระ (เลือกตัวยาเองโดยไม่ใช้สูตร)
+                        </option>
                         @foreach($regimens as $reg)
                             @php
                                 $drugCodes = $reg->details->pluck('rd_medcode')->unique()->implode(', ');
@@ -179,7 +182,6 @@
                             </option>
                         @endforeach
                     </select>
-                    <input type="hidden" name="or_reg_code" id="or_reg_code" value="{{ old('or_reg_code') }}">
                 </div>
 
                 <!-- แผงควบคุมการปรับลดขนาดยา (%) และ Dose Banding / Rounding -->
@@ -258,30 +260,48 @@
                 </div>
             </div>
 
+            <!-- แถบเครื่องมือจัดการรายการยา: ชื่อสูตรยา + ปุ่มสั่งใช้ยาแบบอิสระ + คำแนะนำการ Off ยา -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center bg-light p-2 px-3 rounded-top border border-bottom-0 gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="fw-bold text-dark small"><i class="bi bi-tag-fill text-primary me-1"></i>ชื่อสูตรยา / รูปแบบคำสั่ง:</span>
+                    <input type="text" name="or_reg_code" id="or_reg_code" class="form-control form-control-sm fw-bold text-primary border-primary"
+                        style="width: 210px;" value="{{ old('or_reg_code', 'CUSTOM') }}" placeholder="เช่น FOLFOX-4 หรือ CUSTOM" required>
+                    <span class="badge bg-secondary-subtle text-dark border" id="activeItemsCounter">สั่งใช้จริง: 0 รายการ</span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="small text-secondary d-none d-md-inline">
+                        <i class="bi bi-lightbulb text-warning me-1"></i>สามารถกดปุ่ม <strong>ON/OFF</strong> เพื่อยกเว้นยาบางตัวในสูตร หรือกดเพิ่มยาแบบอิสระได้:
+                    </span>
+                    <button type="button" class="btn btn-sm btn-success fw-bold shadow-sm" onclick="addCustomMedicationRow()">
+                        <i class="bi bi-plus-circle-fill me-1"></i> + สั่งใช้ยาแบบอิสระ / เพิ่มตัวยา (Add Drug)
+                    </button>
+                </div>
+            </div>
+
             <!-- ตารางรายการยาในสูตร Regimen และการคำนวณขนาดยา -->
             <div class="table-responsive">
                 <table class="table table-bordered align-middle mb-0" id="medItemsTable">
                     <thead class="table-dark text-center small">
                         <tr>
-                            <th style="width: 45px;">ลำดับ</th>
-                            <th style="min-width: 190px;">รหัสยา / ชื่อยาเคมีบำบัด</th>
-                            <th style="width: 120px;">ขนาดยาเริ่มต้น<br>(ตาม Regimen)</th>
+                            <th style="width: 95px;">สถานะสั่งยา<br>(ON / OFF)</th>
+                            <th style="min-width: 210px;">รหัสยา / ชื่อยาเคมีบำบัด</th>
+                            <th style="min-width: 145px;">ขนาดยาเริ่มต้น<br>(ตามสูตร / กำหนดเอง)</th>
                             <th style="width: 130px;">ขนาดยาคำนวณ<br>(คูณ BSA/GFR)</th>
-                            <th style="width: 105px;">ปรับลด (%)</th>
-                            <th style="width: 145px;" class="bg-danger">ขนาดยาใหม่ที่ให้จริง<br>(Final Dose, mg)</th>
-                            <th style="min-width: 150px;">สารน้ำ (Diluent)</th>
-                            <th style="width: 110px;">ปริมาตรสารน้ำ<br>(mL)</th>
+                            <th style="width: 100px;">ปรับลด (%)</th>
+                            <th style="width: 195px;" class="bg-danger">ขนาดยาใหม่ที่ให้จริง<br>(Final Dose, mg)</th>
+                            <th style="min-width: 145px;">สารน้ำ (Diluent)</th>
+                            <th style="width: 105px;">ปริมาตรสารน้ำ<br>(mL)</th>
                             <th style="min-width: 140px;">วิถีทาง / เวลาให้ยา</th>
-                            <th style="width: 85px;">เริ่ม Day</th>
-                            <th style="width: 90px;">ให้กี่วัน<br>(reg_d)</th>
-                            <th style="width: 125px;">ช่วงวันที่ให้ยา<br>(Start - Stop)</th>
+                            <th style="width: 80px;">เริ่ม Day</th>
+                            <th style="width: 85px;">ให้กี่วัน<br>(reg_d)</th>
+                            <th style="width: 120px;">ช่วงวันที่ให้ยา<br>(Start - Stop)</th>
                         </tr>
                     </thead>
                     <tbody id="medItemsBody">
                         <tr id="emptyRow">
                             <td colspan="12" class="text-center py-5 text-secondary">
                                 <i class="bi bi-arrow-up-circle fs-2 d-block mb-2 text-primary"></i>
-                                กรุณาเลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน ระบบจะดึงรายการยาและคำนวณขนาดยากับค่า BSA / GFR ให้อัตโนมัติ
+                                เลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน หรือคลิกปุ่ม <strong>"+ สั่งใช้ยาแบบอิสระ / เพิ่มตัวยา"</strong> เพื่อเลือกยาสั่งเองโดยอิสระ
                             </td>
                         </tr>
                     </tbody>
@@ -303,11 +323,33 @@
 @section('js_after')
 <script>
     const REGIMENS_DATA = @json($regimensJson);
+    const MEDS_LIST = @json($meds->values());
+    const UNITS_LIST = @json($units);
     const SOLUTIONS_LIST = @json($solutions);
     const ROUTES_LIST = @json($routes);
     const TIMINGS_LIST = @json($timings);
 
     let currentItems = [];
+
+    function syncInputsToState() {
+        currentItems.forEach((item, idx) => {
+            const solEl = document.querySelector(`[name="items[${idx}][soln]"]`);
+            const volEl = document.getElementById(`solvol_${idx}`);
+            const rtEl  = document.querySelector(`[name="items[${idx}][medroute]"]`);
+            const tmEl  = document.querySelector(`[name="items[${idx}][medtime]"]`);
+            const sdEl  = document.getElementById(`start_day_${idx}`);
+            const durEl = document.getElementById(`duration_${idx}`);
+            const redEl = document.getElementById(`reduce_pct_${idx}`);
+
+            if (solEl) item.soln = solEl.value;
+            if (volEl) item.solvol = parseFloat(volEl.value) || 0;
+            if (rtEl)  item.medroute = rtEl.value;
+            if (tmEl)  item.medtime = tmEl.value;
+            if (sdEl)  item.start_day = parseInt(sdEl.value) || 1;
+            if (durEl) item.duration = parseInt(durEl.value) || 1;
+            if (redEl) item.reduce_pct = parseFloat(redEl.value) || 0;
+        });
+    }
 
     function calculateBsaAndGfr() {
         const wt = parseFloat(document.getElementById('or_wt').value) || 0;
@@ -348,14 +390,21 @@
         const selectedOption = select.options[select.selectedIndex];
         const rhCode = selectedOption ? (selectedOption.getAttribute('data-code') || '') : '';
 
-        document.getElementById('or_reg_code').value = rhCode;
+        if (rhId === 'CUSTOM') {
+            document.getElementById('or_reg_code').value = 'CUSTOM';
+            currentItems = [];
+            addCustomMedicationRow();
+            return;
+        }
 
         if (!rhId || !REGIMENS_DATA[rhId]) {
             currentItems = [];
             renderMedTable();
-            document.getElementById('submitOrderBtn').disabled = true;
+            updateSubmitState();
             return;
         }
+
+        document.getElementById('or_reg_code').value = rhCode;
 
         const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
         const reg = REGIMENS_DATA[rhId];
@@ -377,11 +426,90 @@
             reduce_pct: globalReduce,
             std_dose: 0,
             final_dose: 0,
+            is_off: false,
+            is_custom: false,
         }));
 
         renderMedTable();
         recalculateAllRows();
-        document.getElementById('submitOrderBtn').disabled = false;
+    }
+
+    function addCustomMedicationRow() {
+        syncInputsToState();
+
+        const regCodeInput = document.getElementById('or_reg_code');
+        if (!regCodeInput.value || regCodeInput.value.trim() === '') {
+            regCodeInput.value = 'CUSTOM';
+        }
+
+        const defaultMed = MEDS_LIST.length > 0 ? MEDS_LIST[0] : { dg_code: '5FU', dg_name: 'Fluorouracil (5-FU)', dg_conc: 50, dg_precaution: '' };
+        const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
+
+        currentItems.push({
+            medcode: defaultMed.dg_code,
+            dg_name: defaultMed.dg_name,
+            dg_conc: parseFloat(defaultMed.dg_conc) || 1,
+            dg_precaution: defaultMed.dg_precaution || '',
+            base_dose: 100,
+            medunit: '03', // default mg/m2 (สามารถสลับเป็น 01 = mg คงที่ หรือ 04 = AUC ได้)
+            un_unit: 'mg/m2',
+            soln: 'NSS',
+            solvol: 250,
+            medroute: '01',
+            medtime: '03',
+            start_day: 1,
+            duration: 1,
+            reduce_pct: globalReduce,
+            std_dose: 0,
+            final_dose: 0,
+            is_off: false,
+            is_custom: true,
+        });
+
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function toggleItemOff(idx) {
+        syncInputsToState();
+        if (!currentItems[idx]) return;
+        currentItems[idx].is_off = !currentItems[idx].is_off;
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function removeCustomItem(idx) {
+        syncInputsToState();
+        currentItems.splice(idx, 1);
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function onCustomMedSelectChange(idx, medcode) {
+        syncInputsToState();
+        const found = MEDS_LIST.find(m => m.dg_code === medcode);
+        if (found && currentItems[idx]) {
+            currentItems[idx].medcode = found.dg_code;
+            currentItems[idx].dg_name = found.dg_name;
+            currentItems[idx].dg_conc = parseFloat(found.dg_conc) || 1;
+            currentItems[idx].dg_precaution = found.dg_precaution || '';
+        }
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function onBaseDoseOrUnitChange(idx) {
+        const doseEl = document.getElementById(`base_dose_${idx}`);
+        const unitEl = document.getElementById(`medunit_${idx}`);
+        if (currentItems[idx]) {
+            if (doseEl) currentItems[idx].base_dose = parseFloat(doseEl.value) || 0;
+            if (unitEl) {
+                currentItems[idx].medunit = unitEl.value;
+                const uObj = UNITS_LIST.find(u => u.un_code === unitEl.value);
+                currentItems[idx].un_unit = uObj ? uObj.un_unit : unitEl.value;
+            }
+        }
+        recalculateAllRows();
     }
 
     function renderMedTable() {
@@ -391,14 +519,19 @@
                 <tr>
                     <td colspan="12" class="text-center py-5 text-secondary">
                         <i class="bi bi-arrow-up-circle fs-2 d-block mb-2 text-primary"></i>
-                        กรุณาเลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน
+                        เลือก <strong>สูตรยาเคมีบำบัด (Regimen)</strong> ด้านบน หรือคลิกปุ่ม <strong>"+ สั่งใช้ยาแบบอิสระ / เพิ่มตัวยา"</strong> เพื่อเลือกยาสั่งเองโดยอิสระ
                     </td>
                 </tr>`;
+            updateSubmitState();
             return;
         }
 
         let html = '';
         currentItems.forEach((item, idx) => {
+            const isOff = !!item.is_off;
+            const disabledAttr = isOff ? 'disabled' : '';
+            const rowClass = isOff ? 'table-secondary opacity-50' : '';
+
             const solOptions = SOLUTIONS_LIST.map(s =>
                 `<option value="${s.so_code}" ${s.so_code === item.soln ? 'selected' : ''}>${s.so_code} - ${s.so_name}</option>`
             ).join('');
@@ -411,22 +544,73 @@
                 `<option value="${t.tm_code}" ${t.tm_code === item.medtime ? 'selected' : ''}>${t.tm_time}</option>`
             ).join('');
 
+            const unitOptions = [
+                { code: '03', label: 'mg/m2 (xBSA)' },
+                { code: '01', label: 'mg (Fixed)' },
+                { code: '04', label: 'AUC (Calvert)' },
+            ].map(u => `<option value="${u.code}" ${u.code === item.medunit ? 'selected' : ''}>${u.label}</option>`).join('');
+
+            // ส่วนแสดงชื่อยา (หากเป็นรายการสั่งอิสระ ให้เลือกยาจาก Dropdown ได้ทันที)
+            let medCellHtml = '';
+            if (item.is_custom) {
+                const medOptions = MEDS_LIST.map(m =>
+                    `<option value="${m.dg_code}" ${m.dg_code === item.medcode ? 'selected' : ''}>[${m.dg_code}] ${m.dg_name} (${m.dg_conc} mg/mL)</option>`
+                ).join('');
+                medCellHtml = `
+                    <select name="items[${idx}][medcode]" class="form-select form-select-sm fw-bold text-primary border-primary mb-1"
+                        onchange="onCustomMedSelectChange(${idx}, this.value)" ${disabledAttr}>
+                        ${medOptions}
+                    </select>
+                    <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL <span class="badge bg-info-subtle text-dark border ms-1">สั่งอิสระ</span></small>
+                `;
+            } else {
+                medCellHtml = `
+                    <div class="fw-bold ${isOff ? 'text-decoration-line-through text-secondary' : 'text-primary'}">
+                        [${item.medcode}] ${item.dg_name}
+                        ${isOff ? '<span class="badge bg-danger ms-1">OFF (งดสั่ง)</span>' : ''}
+                    </div>
+                    <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL</small>
+                    <input type="hidden" name="items[${idx}][medcode]" value="${item.medcode}" ${disabledAttr}>
+                `;
+            }
+
             html += `
-                <tr>
-                    <td class="text-center fw-bold">${idx + 1}</td>
-                    <td>
-                        <div class="fw-bold text-primary">[${item.medcode}] ${item.dg_name}</div>
-                        <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL</small>
-                        <input type="hidden" name="items[${idx}][medcode]" value="${item.medcode}">
-                        <input type="hidden" name="items[${idx}][medunit]" value="${item.medunit}">
-                    </td>
+                <tr class="${rowClass}" id="med_row_${idx}">
                     <td class="text-center">
-                        <span class="badge bg-secondary-subtle text-dark fs-6">${item.base_dose} ${item.un_unit}</span>
+                        <div class="d-flex flex-column gap-1 align-items-center">
+                            <button type="button" class="btn btn-sm ${isOff ? 'btn-secondary' : 'btn-success'} fw-bold w-100 py-1"
+                                onclick="toggleItemOff(${idx})" title="คลิกเพื่อเปิด/ปิด (ON/OFF) การสั่งใช้ยาตัวนี้">
+                                <i class="bi ${isOff ? 'bi-toggle-off' : 'bi-toggle-on'} me-1"></i>${isOff ? 'OFF (งด)' : 'ON (สั่ง)'}
+                            </button>
+                            ${item.is_custom ? `
+                                <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0 px-2 w-100" style="font-size: 0.7rem;"
+                                    onclick="removeCustomItem(${idx})">
+                                    <i class="bi bi-trash"></i> ลบแถว
+                                </button>
+                            ` : `<small class="text-muted" style="font-size: 0.68rem;">ลำดับ #${idx + 1}</small>`}
+                        </div>
+                    </td>
+                    <td>
+                        ${medCellHtml}
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm mb-1">
+                            <input type="number" step="0.01" min="0.01"
+                                id="base_dose_${idx}"
+                                class="form-control text-end fw-bold"
+                                value="${item.base_dose}"
+                                oninput="onBaseDoseOrUnitChange(${idx})" ${disabledAttr}>
+                        </div>
+                        <select name="items[${idx}][medunit]" id="medunit_${idx}"
+                            class="form-select form-select-sm text-secondary"
+                            onchange="onBaseDoseOrUnitChange(${idx})" ${disabledAttr}>
+                            ${unitOptions}
+                        </select>
                     </td>
                     <td class="text-center">
                         <div class="fw-bold text-dark fs-6" id="std_dose_text_${idx}">0.00 mg</div>
                         <small class="text-secondary d-block" id="raw_reduced_text_${idx}"></small>
-                        <input type="hidden" name="items[${idx}][std_dose]" id="std_dose_input_${idx}" value="0">
+                        <input type="hidden" name="items[${idx}][std_dose]" id="std_dose_input_${idx}" value="0" ${disabledAttr}>
                     </td>
                     <td>
                         <div class="input-group input-group-sm">
@@ -435,7 +619,7 @@
                                 id="reduce_pct_${idx}"
                                 class="form-control text-center fw-bold text-danger"
                                 value="${item.reduce_pct}"
-                                oninput="onItemReduceChange(${idx}, this.value)">
+                                oninput="onItemReduceChange(${idx}, this.value)" ${disabledAttr}>
                             <span class="input-group-text">%</span>
                         </div>
                     </td>
@@ -446,7 +630,7 @@
                                 id="final_dose_${idx}"
                                 class="form-control text-end dose-highlight"
                                 value="0.00"
-                                oninput="onFinalDoseManualChange(${idx}, this.value)" required>
+                                oninput="onFinalDoseManualChange(${idx}, this.value)" ${disabledAttr} required>
                             <span class="input-group-text fw-bold">mg</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-1">
@@ -456,7 +640,7 @@
                         <div id="band_chips_${idx}" class="d-flex justify-content-end gap-1 mt-1 flex-wrap"></div>
                     </td>
                     <td>
-                        <select name="items[${idx}][soln]" class="form-select form-select-sm">
+                        <select name="items[${idx}][soln]" class="form-select form-select-sm" ${disabledAttr}>
                             ${solOptions}
                         </select>
                     </td>
@@ -466,15 +650,15 @@
                                 name="items[${idx}][solvol]"
                                 id="solvol_${idx}"
                                 class="form-control text-end"
-                                value="${item.solvol}">
+                                value="${item.solvol}" ${disabledAttr}>
                             <span class="input-group-text">mL</span>
                         </div>
                     </td>
                     <td>
-                        <select name="items[${idx}][medroute]" class="form-select form-select-sm mb-1">
+                        <select name="items[${idx}][medroute]" class="form-select form-select-sm mb-1" ${disabledAttr}>
                             ${routeOptions}
                         </select>
-                        <select name="items[${idx}][medtime]" class="form-select form-select-sm">
+                        <select name="items[${idx}][medtime]" class="form-select form-select-sm" ${disabledAttr}>
                             ${timeOptions}
                         </select>
                     </td>
@@ -486,7 +670,7 @@
                                 id="start_day_${idx}"
                                 class="form-control text-center"
                                 value="${item.start_day}"
-                                oninput="updateDateRangeDisplay(${idx})">
+                                oninput="updateDateRangeDisplay(${idx})" ${disabledAttr}>
                         </div>
                     </td>
                     <td>
@@ -496,7 +680,7 @@
                                 id="duration_${idx}"
                                 class="form-control text-center fw-bold text-primary"
                                 value="${item.duration}"
-                                oninput="updateDateRangeDisplay(${idx})">
+                                oninput="updateDateRangeDisplay(${idx})" ${disabledAttr}>
                             <span class="input-group-text">วัน</span>
                         </div>
                     </td>
@@ -508,6 +692,23 @@
         });
 
         tbody.innerHTML = html;
+        updateSubmitState();
+    }
+
+    function updateSubmitState() {
+        const activeItems = currentItems.filter(i => !i.is_off);
+        const offItems = currentItems.filter(i => i.is_off);
+        const counterEl = document.getElementById('activeItemsCounter');
+        const btn = document.getElementById('submitOrderBtn');
+
+        if (counterEl) {
+            counterEl.innerText = offItems.length > 0
+                ? `สั่งใช้จริง: ${activeItems.length} รายการ (งด/OFF: ${offItems.length} รายการ)`
+                : `สั่งใช้จริง: ${activeItems.length} รายการ`;
+        }
+        if (btn) {
+            btn.disabled = activeItems.length === 0;
+        }
     }
 
     // ตารางกำหนด Clinical Dose Banding Step มาตรฐานตามรหัสยา (mg)
@@ -587,9 +788,11 @@
             // Unit 04 = AUC (Calvert Formula: AUC * (GFR + 25))
             if (item.medunit === '04' || (item.un_unit && item.un_unit.toUpperCase() === 'AUC')) {
                 stdDose = item.base_dose * (gfr + 25);
-            } else if (item.medunit === '03' || (item.un_unit && item.un_unit.includes('m2'))) {
-                stdDose = item.base_dose * bsa;
+            } else if (item.medunit === '01') {
+                // Unit 01 = mg (Fixed Dose ไม่คูณ BSA)
+                stdDose = item.base_dose;
             } else {
+                // Unit 03 = mg/m2 (คูณ BSA)
                 stdDose = item.base_dose * bsa;
             }
 
@@ -766,19 +969,29 @@
     function toggleReasonBoxVisibility() {
         const globalPct = parseFloat(document.getElementById('globalReducePct').value) || 0;
         let maxItemPct = 0;
+        const offDrugs = [];
+
         currentItems.forEach((item, idx) => {
-            const el = document.getElementById(`reduce_pct_${idx}`);
-            const p = el ? (parseFloat(el.value) || 0) : 0;
-            if (p > maxItemPct) maxItemPct = p;
+            if (item.is_off && !item.is_custom) {
+                offDrugs.push(item.medcode);
+            }
+            if (!item.is_off) {
+                const el = document.getElementById(`reduce_pct_${idx}`);
+                const p = el ? (parseFloat(el.value) || 0) : 0;
+                if (p > maxItemPct) maxItemPct = p;
+            }
         });
 
-        const hasReduction = (globalPct > 0 || maxItemPct > 0);
+        const hasReductionOrOff = (globalPct > 0 || maxItemPct > 0 || offDrugs.length > 0);
         const box = document.getElementById('reasonBox');
         const reasonInput = document.getElementById('or_adjust_reason');
 
-        if (hasReduction) {
+        if (hasReductionOrOff) {
             box.style.display = 'block';
-            reasonInput.required = true;
+            reasonInput.required = (globalPct > 0 || maxItemPct > 0);
+            if (offDrugs.length > 0 && !reasonInput.value.trim()) {
+                reasonInput.placeholder = `ระบุเหตุผลที่งดสั่งยา [${offDrugs.join(', ')}] หรือปรับลดขนาดยา...`;
+            }
         } else {
             box.style.display = 'none';
             reasonInput.required = false;
