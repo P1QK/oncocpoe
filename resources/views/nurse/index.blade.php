@@ -8,15 +8,34 @@
         <h4 class="fw-bold text-info mb-1">
             <i class="bi bi-clipboard2-pulse-fill me-2"></i>ระบบพยาบาล: ตรวจสอบและบริหารยาเคมีบำบัดรายวัน (Nurse Station)
         </h4>
-        <small class="text-secondary">แสดงตารางการให้ยาเคมีบำบัดรายวัน (<code>onc_dayrecord</code>) ที่ผ่านการยืนยันจากเภสัชกรแล้ว</small>
+        <small class="text-secondary">
+            แสดง <strong>เฉพาะรายการยาที่ให้ตรงวัน</strong>
+            (ประจำวันที่ <strong class="text-dark">{{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}</strong> &mdash; ไม่แสดงรายการยาของวันถัดไป)
+            จัดกลุ่มตามผู้ป่วยพร้อมรายการยาย่อยด้านใต้
+        </small>
+    </div>
+    <div>
+        <span class="badge bg-info text-dark fs-6 px-3 py-2 shadow-sm">
+            <i class="bi bi-calendar-check-fill me-1"></i>
+            วันที่ให้ยา: {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}
+            @if($selectedDate === today()->format('Y-m-d'))
+                (วันนี้)
+            @endif
+        </span>
     </div>
 </div>
 
-<!-- สรุปสถิติ -->
+<!-- สรุปสถิติประจำวันที่เลือก -->
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-6">
+        <div class="card card-medical bg-white p-3 border-start border-4 border-dark">
+            <div class="small text-secondary">ผู้ป่วยที่ได้รับยาในวันนี้ (ราย)</div>
+            <div class="fs-3 fw-bold text-dark">{{ $stats['patients_today'] }}</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-info">
-            <div class="small text-secondary">รายการให้ยาวันนี้</div>
+            <div class="small text-secondary">รายการยารวมในวันนี้ (ขวด/โดส)</div>
             <div class="fs-3 fw-bold text-info">{{ $stats['today_doses'] }}</div>
         </div>
     </div>
@@ -32,23 +51,22 @@
             <div class="fs-3 fw-bold text-primary">{{ $stats['delivered'] }}</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
-        <div class="card card-medical bg-white p-3 border-start border-4 border-dark">
-            <div class="small text-secondary">คำสั่งที่ยืนยันทั้งหมด</div>
-            <div class="fs-3 fw-bold text-dark">{{ $stats['confirmed_orders'] }}</div>
-        </div>
-    </div>
 </div>
 
 <!-- ตัวกรอง -->
 <div class="card card-medical bg-white mb-4">
     <div class="card-body py-3">
-        <form method="GET" action="{{ route('nurse.index') }}" class="row g-2 align-items-center">
+        <form method="GET" action="{{ route('nurse.index') }}" class="row g-2 align-items-end">
             <div class="col-md-4">
-                <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="ค้นหา HN หรือ ชื่อผู้ป่วย...">
+                <label class="form-label small fw-bold text-secondary mb-1">ค้นหาผู้ป่วย (HN / ชื่อ-นามสกุล):</label>
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="ระบุ HN หรือ ชื่อ-นามสกุลผู้ป่วย...">
+                </div>
             </div>
             <div class="col-md-3">
-                <select name="ward" class="form-select">
+                <label class="form-label small fw-bold text-secondary mb-1">หอผู้ป่วย (Ward):</label>
+                <select name="ward" class="form-select" onchange="this.form.submit()">
                     <option value="">-- ทุกหอผู้ป่วย --</option>
                     @foreach($wards as $w)
                         <option value="{{ $w->wd_code }}" {{ $selectedWard == $w->wd_code ? 'selected' : '' }}>
@@ -58,95 +76,176 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <input type="date" name="date" class="form-control" value="{{ $selectedDate }}">
+                <label class="form-label small fw-bold text-secondary mb-1">วันที่ให้ยา (แสดงเฉพาะตรงวัน):</label>
+                <input type="date" name="date" class="form-control fw-bold border-info" value="{{ $selectedDate }}" onchange="this.form.submit()">
             </div>
             <div class="col-md-2 d-flex gap-1">
-                <button type="submit" class="btn btn-info text-dark fw-semibold w-100">กรองข้อมูล</button>
-                <a href="{{ route('nurse.index') }}" class="btn btn-outline-secondary">ล้าง</a>
+                <button type="submit" class="btn btn-info text-dark fw-semibold w-100">
+                    <i class="bi bi-funnel-fill me-1"></i> กรองข้อมูล
+                </button>
+                <a href="{{ route('nurse.index') }}" class="btn btn-outline-secondary" title="กลับสู่วันนี้">วันนี้</a>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ตารางรายการบริหารยารายวัน -->
-<div class="card card-medical bg-white">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th>วันที่ให้ยา</th>
-                    <th>HN / ชื่อผู้ป่วย / หอผู้ป่วย</th>
-                    <th>รายการยาเคมีบำบัด &amp; ขนาดยา</th>
-                    <th>สารน้ำ &amp; ปริมาตรรวม</th>
-                    <th>วิธีบริหารยา / เวลา</th>
-                    <th>ข้อควรระวัง (High-Alert)</th>
-                    <th>สถานะ</th>
-                    <th class="text-end">ยืนยันรับ/ให้ยา</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($dayRecords as $rec)
-                    <tr>
-                        <td>
-                            <div class="fw-bold text-primary">{{ \Carbon\Carbon::parse($rec->or_daterec)->format('d/m/Y') }}</div>
-                            <span class="badge bg-light text-dark border">{{ $rec->or_text }}</span>
-                        </td>
-                        <td>
-                            <div class="fw-bold">{{ optional($rec->orderHeader)->or_patname ?? '-' }}</div>
-                            <small class="text-secondary">
-                                HN: {{ optional($rec->orderHeader)->or_hn ?? '-' }} |
-                                {{ optional(optional($rec->orderHeader)->ward)->wd_name ?? optional($rec->orderHeader)->or_ward }}
-                            </small>
-                        </td>
-                        <td>
-                            <div class="fw-bold text-danger">[{{ $rec->or_medcode }}] {{ optional($rec->medication)->dg_name ?? $rec->or_medcode }}</div>
-                            <span class="badge bg-danger-subtle text-danger fs-6">{{ number_format($rec->or_meddose, 2) }} mg</span>
-                        </td>
-                        <td>
-                            <div>{{ optional($rec->solution)->so_name ?? $rec->or_soln }} ({{ number_format($rec->or_solvol, 0) }} mL)</div>
-                            <small class="text-muted">ปริมาตรรวม: {{ number_format($rec->or_totalvol, 2) }} mL</small>
-                        </td>
-                        <td>
-                            <div>{{ optional($rec->route)->rt_name ?? $rec->or_medroute }}</div>
-                            <small class="fw-bold text-primary">{{ optional($rec->timing)->tm_time ?? $rec->or_medtime }}</small>
-                        </td>
-                        <td>
-                            <small class="text-danger">{{ optional($rec->medication)->dg_precaution ?? '-' }}</small>
-                        </td>
-                        <td>
-                            @if($rec->or_send == 1)
-                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>บริหารยาแล้ว</span>
-                            @elseif($rec->or_prep == 1)
-                                <span class="badge bg-info text-dark">เตรียมยาพร้อมใช้</span>
-                            @else
-                                <span class="badge bg-warning text-dark">กำลังเตรียมยา</span>
-                            @endif
-                        </td>
-                        <td class="text-end">
-                            @if($rec->or_send == 0)
-                                <form method="POST" action="{{ route('nurse.acknowledge') }}">
-                                    @csrf
-                                    <input type="hidden" name="or_id" value="{{ $rec->or_id }}">
-                                    <input type="hidden" name="or_daterec" value="{{ $rec->or_daterec }}">
-                                    <input type="hidden" name="or_orderno" value="{{ $rec->or_orderno }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-success fw-semibold">
-                                        <i class="bi bi-check2-circle me-1"></i> ยืนยันให้ยา
-                                    </button>
-                                </form>
-                            @else
-                                <span class="text-success small fw-semibold"><i class="bi bi-check-all"></i> เรียบร้อย</span>
-                            @endif
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="8" class="text-center py-5 text-secondary">
-                            ยังไม่มีรายการตารางให้ยารายวัน (รายการจะแสดงเมื่อเภสัชกรกด Confirm รับคำสั่งใช้ยาแล้ว)
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+<!-- รายการผู้ป่วยและรายการยาย่อยใต้ชื่อผู้ป่วย (เฉพาะยาที่ให้ตรงวัน) -->
+@forelse($patientsGroup as $patIndex => $patient)
+    <div class="card card-medical bg-white mb-4 border-top border-4 {{ $patient->all_sent ? 'border-success' : 'border-info' }}">
+        <!-- ส่วนหัวข้อมูลผู้ป่วย: HN และ ชื่อ-นามสกุลผู้ป่วย -->
+        <div class="card-header bg-light py-3 px-4">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="badge bg-dark fs-6 px-3 py-2">
+                        <i class="bi bi-person-vcard me-1"></i> HN: {{ $patient->or_hn }}
+                    </span>
+                    <h5 class="fw-bold text-dark mb-0 me-2">
+                        {{ $patient->or_patname }}
+                    </h5>
+                    <span class="badge bg-secondary-subtle text-dark border px-2 py-1">
+                        <i class="bi bi-hospital me-1"></i> หอผู้ป่วย: {{ $patient->ward_name }}
+                    </span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
+                        Regimen: {{ $patient->or_reg_code }} (Cycle #{{ $patient->or_cycle }})
+                    </span>
+                </div>
+
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-info-subtle text-dark border border-info px-3 py-2">
+                        รายการยาวันนี้: <strong>{{ $patient->doses_count }}</strong> รายการ
+                        (บริหารแล้ว {{ $patient->send_count }}/{{ $patient->doses_count }})
+                    </span>
+
+                    @if(!$patient->all_sent)
+                        <form method="POST" action="{{ route('nurse.acknowledge') }}" class="d-inline"
+                              onsubmit="return confirm('ยืนยันการรับยาและบริหารยาครบทุกรายการของ {{ $patient->or_patname }} (HN: {{ $patient->or_hn }}) ประจำวันที่ {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }} ใช่หรือไม่?');">
+                            @csrf
+                            <input type="hidden" name="or_id" value="{{ $patient->or_id }}">
+                            <input type="hidden" name="or_daterec" value="{{ $selectedDate }}">
+                            <button type="submit" class="btn btn-sm btn-success fw-semibold shadow-sm">
+                                <i class="bi bi-check2-all me-1"></i> ยืนยันให้ยาครบทุกรายการวันนี้
+                            </button>
+                        </form>
+                    @else
+                        <span class="badge bg-success px-3 py-2">
+                            <i class="bi bi-check-circle-fill me-1"></i> บริหารยาวันนี้ครบแล้ว
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            <!-- ข้อมูลทางคลินิกเสริมของผู้ป่วย -->
+            <div class="mt-2 pt-2 border-top d-flex flex-wrap gap-3 small text-secondary">
+                <span><strong>เลขที่คำสั่ง (Order ID):</strong> {{ $patient->or_id }}</span>
+                @if($patient->or_age)
+                    <span><strong>อายุ/เพศ:</strong> {{ $patient->or_age }} ปี ({{ $patient->or_sex === 'F' ? 'หญิง' : 'ชาย' }})</span>
+                @endif
+                @if($patient->or_wt && $patient->or_ht)
+                    <span><strong>น้ำหนัก/ส่วนสูง:</strong> {{ number_format($patient->or_wt, 1) }} kg / {{ number_format($patient->or_ht, 0) }} cm</span>
+                @endif
+                @if($patient->or_bsa)
+                    <span><strong>BSA:</strong> <span class="text-primary fw-bold">{{ number_format($patient->or_bsa, 2) }} m&sup2;</span></span>
+                @endif
+                @if($patient->or_gfr)
+                    <span><strong>GFR:</strong> <span class="text-success fw-bold">{{ number_format($patient->or_gfr, 1) }} mL/min</span></span>
+                @endif
+                @if($patient->or_doctor_name)
+                    <span><strong>แพทย์ผู้สั่ง:</strong> {{ $patient->or_doctor_name }}</span>
+                @endif
+            </div>
+        </div>
+
+        <!-- รายการยาย่อยใต้ชื่อผู้ป่วย (เฉพาะยาที่ให้ตรงวันที่เลือก) -->
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th class="ps-4" style="width: 70px;">ลำดับ</th>
+                            <th>รายการยาย่อย &amp; ขนาดยา</th>
+                            <th>สารน้ำ &amp; ปริมาตรรวม</th>
+                            <th>วิธีบริหารยา / เวลา</th>
+                            <th class="text-center">วันในคอร์ส (ตรงวัน)</th>
+                            <th>ข้อควรระวัง (High-Alert)</th>
+                            <th class="text-center">สถานะยา</th>
+                            <th class="text-end pe-4">ยืนยันรับ/ให้ยา</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($patient->items as $idx => $rec)
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="badge bg-secondary rounded-pill">#{{ $rec->or_orderno }}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-danger">
+                                        [{{ $rec->or_medcode }}] {{ optional($rec->medication)->dg_name ?? $rec->or_medcode }}
+                                    </div>
+                                    <span class="badge bg-danger-subtle text-danger fs-6 mt-1">
+                                        {{ number_format($rec->or_meddose, 2) }} {{ optional($rec->unit)->un_unit ?? 'mg' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">{{ optional($rec->solution)->so_name ?? $rec->or_soln }} ({{ number_format($rec->or_solvol, 0) }} mL)</div>
+                                    <small class="text-muted">
+                                        ดูดยา: {{ number_format($rec->or_working, 2) }} mL |
+                                        ปริมาตรรวม: <strong>{{ number_format($rec->or_totalvol, 2) }} mL</strong>
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">{{ optional($rec->route)->rt_name ?? $rec->or_medroute }}</div>
+                                    <small class="fw-bold text-primary">
+                                        <i class="bi bi-clock me-1"></i>{{ optional($rec->timing)->tm_time ?? $rec->or_medtime }}
+                                    </small>
+                                </td>
+                                <td class="text-center">
+                                    <div class="fw-bold text-primary">{{ \Carbon\Carbon::parse($rec->or_daterec)->format('d/m/Y') }}</div>
+                                    <span class="badge bg-light text-dark border">{{ $rec->or_text }}</span>
+                                </td>
+                                <td>
+                                    <small class="text-danger">{{ optional($rec->medication)->dg_precaution ?? '-' }}</small>
+                                </td>
+                                <td class="text-center">
+                                    @if($rec->or_send == 1)
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>บริหารยาแล้ว</span>
+                                    @elseif($rec->or_prep == 1)
+                                        <span class="badge bg-info text-dark">เตรียมยาพร้อมใช้</span>
+                                    @else
+                                        <span class="badge bg-warning text-dark">กำลังเตรียมยา</span>
+                                    @endif
+                                </td>
+                                <td class="text-end pe-4">
+                                    @if($rec->or_send == 0)
+                                        <form method="POST" action="{{ route('nurse.acknowledge') }}">
+                                            @csrf
+                                            <input type="hidden" name="or_id" value="{{ $rec->or_id }}">
+                                            <input type="hidden" name="or_daterec" value="{{ $rec->or_daterec }}">
+                                            <input type="hidden" name="or_orderno" value="{{ $rec->or_orderno }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-success fw-semibold">
+                                                <i class="bi bi-check2-circle me-1"></i> ยืนยันให้ยา
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="text-success small fw-semibold"><i class="bi bi-check-all"></i> เรียบร้อย</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
+@empty
+    <div class="card card-medical bg-white">
+        <div class="card-body text-center py-5 text-secondary">
+            <i class="bi bi-calendar2-x fs-1 d-block mb-2 opacity-50"></i>
+            <h6 class="fw-bold text-dark">ไม่มีรายการยาเคมีบำบัดที่ต้องให้ในวันที่ {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}</h6>
+            <div class="small">
+                ระบบแสดงเฉพาะยาที่ให้ตรงกับวันที่เลือกเท่านั้น (ไม่แสดงรายการยาของวันถัดไป)
+                หากต้องการตรวจสอบวันอื่น สามารถเลือกวันที่จากตัวกรองด้านบนได้
+            </div>
+        </div>
+    </div>
+@endforelse
 @endsection

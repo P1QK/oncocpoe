@@ -12,7 +12,8 @@ class NurseController extends Controller
 {
     public function index(Request $request)
     {
-        $selectedDate = $request->input('date');
+        // แสดงเฉพาะยาที่ให้ตรงวัน (ค่าเริ่มต้นคือวันนี้) ไม่ดึงของวันถัดไปมาปน
+        $selectedDate = $request->input('date') ?: today()->format('Y-m-d');
         $selectedWard = $request->input('ward');
 
         $query = OncDayRecord::with([
@@ -22,11 +23,10 @@ class NurseController extends Controller
             'solution',
             'route',
             'timing',
-        ])->orderBy('or_daterec')->orderBy('or_id')->orderBy('or_orderno');
-
-        if ($selectedDate) {
-            $query->whereDate('or_daterec', $selectedDate);
-        }
+        ])
+            ->whereDate('or_daterec', $selectedDate)
+            ->orderBy('or_id')
+            ->orderBy('or_orderno');
 
         if ($selectedWard) {
             $query->whereHas('orderHeader', function ($q) use ($selectedWard) {
@@ -43,17 +43,55 @@ class NurseController extends Controller
             });
         }
 
-        $dayRecords = $query->paginate(20)->withQueryString();
+        $dayRecords = $query->get();
+
+        // จัดกลุ่มตามผู้ป่วย (Order / HN) เพื่อแสดง HN ชื่อ-นามสกุลผู้ป่วยเป็นหัวข้อหลัก และรายการยาย่อยอยู่ด้านใต้
+        $patientsGroup = $dayRecords->groupBy('or_id')->map(function ($items, $orId) {
+            $first = $items->first();
+            $header = $first->orderHeader;
+
+            return (object) [
+                'or_id'             => $orId,
+                'or_hn'             => optional($header)->or_hn ?? '-',
+                'or_patname'        => optional($header)->or_patname ?? '-',
+                'or_age'            => optional($header)->or_age,
+                'or_sex'            => optional($header)->or_sex,
+                'or_wt'             => optional($header)->or_wt,
+                'or_ht'             => optional($header)->or_ht,
+                'or_bsa'            => optional($header)->or_bsa,
+                'or_gfr'            => optional($header)->or_gfr,
+                'or_reg_code'       => optional($header)->or_reg_code ?? '-',
+                'or_cycle'          => optional($header)->or_cycle ?? 1,
+                'or_doctor_name'    => optional($header)->or_doctor_name,
+                'or_adjust_percent' => optional($header)->or_adjust_percent ?? 0,
+                'or_adjust_reason'  => optional($header)->or_adjust_reason,
+                'ward_code'         => optional($header)->or_ward ?? '-',
+                'ward_name'         => optional(optional($header)->ward)->wd_name ?? optional($header)->or_ward ?? '-',
+                'doses_count'       => $items->count(),
+                'prep_count'        => $items->where('or_prep', 1)->count(),
+                'send_count'        => $items->where('or_send', 1)->count(),
+                'all_sent'          => $items->every(fn ($item) => (int) $item->or_send === 1),
+                'items'             => $items->sortBy('or_orderno')->values(),
+            ];
+        })->values();
+
         $wards = Ward::orderBy('wd_code')->get();
 
         $stats = [
-            'confirmed_orders' => OrderHeader::where('or_confirm', 1)->count(),
-            'today_doses'      => OncDayRecord::whereDate('or_daterec', today())->count(),
-            'ready_to_admin'   => OncDayRecord::where('or_prep', 1)->count(),
-            'delivered'        => OncDayRecord::where('or_send', 1)->count(),
+            'patients_today'   => $patientsGroup->count(),
+            'today_doses'      => OncDayRecord::whereDate('or_daterec', $selectedDate)->count(),
+            'ready_to_admin'   => OncDayRecord::whereDate('or_daterec', $selectedDate)->where('or_prep', 1)->count(),
+            'delivered'        => OncDayRecord::whereDate('or_daterec', $selectedDate)->where('or_send', 1)->count(),
         ];
 
-        return view('nurse.index', compact('dayRecords', 'wards', 'stats', 'selectedDate', 'selectedWard'));
+        return view('nurse.index', compact(
+            'dayRecords',
+            'patientsGroup',
+            'wards',
+            'stats',
+            'selectedDate',
+            'selectedWard'
+        ));
     }
 
     public function acknowledge(Request $request)
@@ -61,16 +99,20 @@ class NurseController extends Controller
         $request->validate([
             'or_id'      => ['required', 'string'],
             'or_daterec' => ['required', 'date'],
-            'or_orderno' => ['required', 'integer'],
+            'or_orderno' => ['nullable', 'integer'],
         ]);
 
-        DB::table('onc_dayrecord')
+        $query = DB::table('onc_dayrecord')
             ->where('or_id', $request->input('or_id'))
-            ->where('or_daterec', $request->input('or_daterec'))
-            ->where('or_orderno', $request->input('or_orderno'))
-            ->update([
-                'or_send' => 1,
-            ]);
+            ->whereDate('or_daterec', $request->input('or_daterec'));
+
+        if ($request->filled('or_orderno')) {
+            $query->where('or_orderno', $request->input('or_orderno'));
+        }
+
+        $query->update([
+            'or_send' => 1,
+        ]);
 
         return back()->with('success', 'พยาบาลยืนยันการรับยาและตรวจสอบ 5 Rights เรียบร้อยแล้ว');
     }
