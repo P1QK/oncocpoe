@@ -11,54 +11,121 @@
             font-family: 'Sarabun', sans-serif;
             background-color: #e2e8f0;
             color: #000;
-            font-size: 12px;
+            font-size: 9.5px;
         }
         .labels-grid {
-            max-width: 210mm;
+            max-width: 19cm;
             margin: 15px auto;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            display: flex;
+            flex-wrap: wrap;
             gap: 10px;
+            justify-content: flex-start;
         }
+        /* กำหนดขนาดสติกเกอร์ทุกดวง: กว้าง 9 cm x สูง 7 cm */
         .chemo-label-card {
+            width: 9cm;
+            height: 7cm;
+            min-width: 9cm;
+            max-width: 9cm;
+            min-height: 7cm;
+            max-height: 7cm;
+            box-sizing: border-box;
             background: #fff;
-            border: 2px solid #0f172a;
-            border-radius: 8px;
-            padding: 10px 12px;
+            border: 1.8px solid #0f172a;
+            border-radius: 6px;
+            padding: 5px 7px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            font-size: 9.5px;
+            line-height: 1.22;
             page-break-inside: avoid;
+            break-inside: avoid;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         .summary-label-card {
             background: #f8fafc;
-            border: 2.5px solid #1e3a8a;
+            border: 2px solid #1e3a8a;
         }
         .chemo-banner {
             background-color: #0f172a;
             color: #fff;
-            padding: 3px 8px;
-            border-radius: 4px;
+            padding: 2.5px 6px;
+            border-radius: 3px;
             font-weight: 700;
-            font-size: 11px;
+            font-size: 9.5px;
+            line-height: 1.2;
+            flex-shrink: 0;
         }
         .summary-banner {
             background: linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%);
             color: #fff;
-            padding: 3px 8px;
-            border-radius: 4px;
+            padding: 2.5px 6px;
+            border-radius: 3px;
             font-weight: 700;
+            font-size: 9.5px;
+            line-height: 1.2;
+            flex-shrink: 0;
+        }
+        .sticker-patient-box {
+            font-size: 9.5px;
+            line-height: 1.2;
+            padding-bottom: 3px;
+            margin-bottom: 3px;
+            border-bottom: 1px solid #cbd5e1;
+            flex-shrink: 0;
+        }
+        .sticker-patname {
             font-size: 11px;
+            font-weight: 700;
         }
         .drug-box {
             border: 1.5px solid #dc2626;
             background-color: #fff5f5;
-            border-radius: 6px;
-            padding: 6px 8px;
-            margin: 6px 0;
+            border-radius: 4px;
+            padding: 4px 6px;
+            margin: 2px 0;
+            font-size: 9.5px;
+            line-height: 1.25;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .drug-title {
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .drug-dose {
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .precaution-line {
+            font-size: 8.5px;
+            line-height: 1.15;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .summary-body-box {
+            flex-grow: 1;
+            overflow: hidden;
         }
         .summary-table th, .summary-table td {
-            padding: 2px 5px;
-            font-size: 11px;
+            padding: 1.5px 3px !important;
+            font-size: 8.2px;
+            line-height: 1.15;
             border-color: #cbd5e1 !important;
+        }
+        .sticker-footer {
+            font-size: 8.5px;
+            line-height: 1.15;
+            padding-top: 3px;
+            border-top: 1px solid #cbd5e1;
+            flex-shrink: 0;
         }
         @media print {
             body {
@@ -71,8 +138,15 @@
             .labels-grid {
                 max-width: 100%;
                 margin: 0;
+                gap: 4mm;
             }
             .chemo-label-card {
+                width: 9cm !important;
+                height: 7cm !important;
+                min-width: 9cm !important;
+                max-width: 9cm !important;
+                min-height: 7cm !important;
+                max-height: 7cm !important;
                 box-shadow: none;
             }
         }
@@ -125,69 +199,62 @@
 
 <div class="labels-grid">
     @foreach($labelsByDate as $dateStr => $dayItems)
-        <!-- 1. สติกเกอร์สรุปรายการยาของคนไข้ประจำวันนั้น (1 ดวง) -->
+        <!-- 1. สติกเกอร์สรุปรายการยาของคนไข้ประจำวันนั้น (ขนาด 9 cm x 7 cm) -->
         <div class="chemo-label-card summary-label-card">
             <div class="d-flex justify-content-between align-items-center summary-banner mb-1">
-                <span><i class="bi bi-card-checklist me-1"></i> สติกเกอร์สรุปรายการยาประจำวัน (DAILY SUMMARY)</span>
-                <span>วันที่ให้ยา: {{ \Carbon\Carbon::parse($dateStr)->format('d/m/Y') }}</span>
+                <span><i class="bi bi-card-checklist me-1"></i> สรุปรายการยาประจำวัน</span>
+                <span>วันที่: {{ \Carbon\Carbon::parse($dateStr)->format('d/m/Y') }}</span>
             </div>
 
-            <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
-                <div>
-                    <div class="fw-bold fs-6">{{ $order->or_patname }}</div>
+            <div class="d-flex justify-content-between sticker-patient-box">
+                <div class="text-truncate pe-1">
+                    <div class="sticker-patname text-truncate">{{ $order->or_patname }}</div>
                     <div>
                         <strong>HN:</strong> {{ $order->or_hn }} |
-                        <strong>หอผู้ป่วย:</strong> {{ optional($order->ward)->wd_name ?? $order->or_ward }} |
-                        <strong>BSA:</strong> {{ number_format($order->or_bsa, 2) }} m&sup2;
+                        <strong>Ward:</strong> {{ optional($order->ward)->wd_name ?? $order->or_ward }} |
+                        <strong>BSA:</strong> {{ number_format($order->or_bsa, 2) }}
                     </div>
                 </div>
-                <div class="text-end small">
-                    <div><strong>Order:</strong> {{ $order->or_id }}</div>
-                    <div><strong>Regimen:</strong> <span class="fw-bold">{{ $order->or_reg_code }}</span></div>
+                <div class="text-end text-nowrap">
+                    <div><strong>ID:</strong> {{ $order->or_id }}</div>
+                    <div><strong>Reg:</strong> <span class="fw-bold">{{ $order->or_reg_code }}</span></div>
                 </div>
             </div>
 
-            <div class="bg-white border border-primary rounded-2 p-1 my-1">
-                <div class="small fw-bold text-primary mb-1 px-1 d-flex justify-content-between">
-                    <span>รายการยาที่ได้รับในวันนี้ทั้งหมด:</span>
-                    <span class="badge bg-primary">รวม {{ $dayItems->count() }} รายการ</span>
+            <div class="bg-white border border-primary rounded-1 p-1 summary-body-box">
+                <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 8.5px;">
+                    <span>รายการยาที่ได้รับวันนี้:</span>
+                    <span class="badge bg-primary" style="font-size: 7.5px;">รวม {{ $dayItems->count() }} รายการ</span>
                 </div>
                 <table class="table table-bordered summary-table mb-0">
                     <thead class="table-light text-center">
                         <tr>
-                            <th style="width: 22px;">#</th>
-                            <th>ชื่อยาเคมีบำบัด</th>
-                            <th>ขนาดยา</th>
-                            <th>สารน้ำ / ปริมาตรรวม</th>
-                            <th>วิธีให้ / เวลา</th>
-                            <th>เริ่ม &ndash; สิ้นสุด (Start &ndash; Stop)</th>
+                            <th style="width: 16px;">#</th>
+                            <th>ชื่อยา</th>
+                            <th>ขนาด</th>
+                            <th>สารน้ำ/รวม</th>
+                            <th>วิธี/เวลา</th>
+                            <th>Day</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach($dayItems as $dItem)
                             <tr>
                                 <td class="text-center fw-bold">{{ $dItem->or_orderno }}</td>
-                                <td class="fw-bold text-danger">
+                                <td class="fw-bold text-danger text-truncate" style="max-width: 72px;">
                                     {{ optional($dItem->medication)->dg_name ?? $dItem->or_medcode }}
                                 </td>
-                                <td class="text-end fw-bold">
-                                    {{ number_format($dItem->or_meddose, 2) }} {{ optional($dItem->unit)->un_unit ?? 'mg' }}
+                                <td class="text-end fw-bold text-nowrap">
+                                    {{ number_format($dItem->or_meddose, 1) }} {{ optional($dItem->unit)->un_unit ?? 'mg' }}
                                 </td>
-                                <td>
-                                    {{ $dItem->or_soln }} ({{ number_format($dItem->or_solvol, 0) }} mL)
-                                    <small class="text-muted">รวม {{ number_format($dItem->or_totalvol, 1) }} mL</small>
+                                <td class="text-nowrap">
+                                    {{ $dItem->or_soln }} ({{ number_format($dItem->or_totalvol, 0) }}mL)
                                 </td>
-                                <td>
-                                    {{ optional($dItem->route)->rt_name ?? $dItem->or_medroute }} /
+                                <td class="text-truncate" style="max-width: 65px;">
                                     {{ optional($dItem->timing)->tm_time ?? $dItem->or_medtime }}
                                 </td>
-                                <td class="text-center fw-semibold text-nowrap">
-                                    {{ $dItem->or_start ? \Carbon\Carbon::parse($dItem->or_start)->format('d/m/y') : '-' }}
-                                    &ndash;
-                                    {{ $dItem->or_stop ? \Carbon\Carbon::parse($dItem->or_stop)->format('d/m/y') : '-' }}
-                                    @if($dItem->or_text)
-                                        <span class="badge bg-light text-dark border ms-1">{{ $dItem->or_text }}</span>
-                                    @endif
+                                <td class="text-center text-nowrap">
+                                    {{ $dItem->or_text ?: '-' }}
                                 </td>
                             </tr>
                         @endforeach
@@ -195,62 +262,62 @@
                 </table>
             </div>
 
-            <div class="d-flex justify-content-between border-top pt-1 mt-1 small text-secondary">
-                <span>เภสัชกรผู้ส่งมอบ: ..............................</span>
-                <span>พยาบาลผู้รับยา: ..............................</span>
-                <span>เวลา: ............. น.</span>
+            <div class="d-flex justify-content-between sticker-footer text-secondary">
+                <span>ผู้ส่ง: .........................</span>
+                <span>ผู้รับ: .........................</span>
+                <span>เวลา: .......... น.</span>
             </div>
         </div>
 
-        <!-- 2. สติกเกอร์ยารายขวด/ถุง ของคนไข้ในวันนั้น -->
+        <!-- 2. สติกเกอร์ยารายขวด/ถุง ของคนไข้ในวันนั้น (ขนาด 9 cm x 7 cm) -->
         @foreach($dayItems->values() as $itemIdx => $lbl)
             <div class="chemo-label-card">
                 <div class="d-flex justify-content-between align-items-center chemo-banner mb-1">
                     <span><i class="bi bi-radioactive me-1"></i> ยาเคมีบำบัด (ขวดที่ {{ $itemIdx + 1 }}/{{ $dayItems->count() }})</span>
-                    <span>วันที่ให้ยา: {{ \Carbon\Carbon::parse($lbl->or_daterec)->format('d/m/Y') }} ({{ $lbl->or_text }})</span>
+                    <span>{{ \Carbon\Carbon::parse($lbl->or_daterec)->format('d/m/Y') }} ({{ $lbl->or_text }})</span>
                 </div>
 
-                <div class="d-flex justify-content-between border-bottom pb-1 mb-1">
-                    <div>
-                        <div class="fw-bold fs-6">{{ $order->or_patname }}</div>
+                <div class="d-flex justify-content-between sticker-patient-box">
+                    <div class="text-truncate pe-1">
+                        <div class="sticker-patname text-truncate">{{ $order->or_patname }}</div>
                         <div><strong>HN:</strong> {{ $order->or_hn }} | <strong>หอผู้ป่วย:</strong> {{ optional($order->ward)->wd_name ?? $order->or_ward }}</div>
                     </div>
-                    <div class="text-end small">
-                        <div><strong>Order:</strong> {{ $order->or_id }}</div>
-                        <div><strong>Regimen:</strong> {{ $order->or_reg_code }}</div>
+                    <div class="text-end text-nowrap">
+                        <div><strong>ID:</strong> {{ $order->or_id }}</div>
+                        <div><strong>Reg:</strong> {{ $order->or_reg_code }}</div>
                     </div>
                 </div>
 
                 <div class="drug-box">
                     <div class="d-flex justify-content-between align-items-baseline">
-                        <div class="fw-bold fs-6 text-danger">
+                        <div class="drug-title text-danger text-truncate pe-1">
                             {{ $lbl->or_orderno }}. {{ optional($lbl->medication)->dg_name ?? $lbl->or_medcode }}
                         </div>
-                        <div class="fw-bold fs-5 text-dark">
+                        <div class="drug-dose text-dark text-nowrap">
                             {{ number_format($lbl->or_meddose, 2) }} {{ optional($lbl->unit)->un_unit ?? 'mg' }}
                         </div>
                     </div>
                     <div class="mt-1">
-                        <strong>ผสมในสารน้ำ:</strong> {{ optional($lbl->solution)->so_name ?? $lbl->or_soln }}
+                        <strong>สารน้ำ:</strong> {{ optional($lbl->solution)->so_name ?? $lbl->or_soln }}
                         <strong>{{ number_format($lbl->or_solvol, 0) }} mL</strong>
                         (ดูดยา {{ number_format($lbl->or_working, 2) }} mL | รวม <strong>{{ number_format($lbl->or_totalvol, 2) }} mL</strong>)
                     </div>
-                    <div>
-                        <strong>วิธีบริหารยา:</strong> {{ optional($lbl->route)->rt_name ?? $lbl->or_medroute }}
-                        &bull; <strong>อัตราเร็ว/เวลา:</strong> <span class="text-decoration-underline fw-bold">{{ optional($lbl->timing)->tm_time ?? $lbl->or_medtime }}</span>
+                    <div class="mt-1">
+                        <strong>วิธีให้:</strong> {{ optional($lbl->route)->rt_name ?? $lbl->or_medroute }}
+                        &bull; <strong>เวลา:</strong> <span class="text-decoration-underline fw-bold">{{ optional($lbl->timing)->tm_time ?? $lbl->or_medtime }}</span>
                     </div>
                 </div>
 
                 @if(optional($lbl->medication)->dg_precaution)
-                    <div class="small text-danger mb-1">
-                        <strong>ข้อควรระวัง:</strong> {{ optional($lbl->medication)->dg_precaution }}
+                    <div class="precaution-line text-danger my-1">
+                        <strong>ระวัง:</strong> {{ optional($lbl->medication)->dg_precaution }}
                     </div>
                 @endif
 
-                <div class="d-flex justify-content-between border-top pt-1 mt-1 small text-secondary">
-                    <span>ผู้เตรียม: ..............................</span>
-                    <span>ผู้ตรวจ: ..............................</span>
-                    <span>เวลาเตรียม: ............. น.</span>
+                <div class="d-flex justify-content-between sticker-footer text-secondary">
+                    <span>ผู้เตรียม: .......................</span>
+                    <span>ผู้ตรวจ: .......................</span>
+                    <span>เวลา: .......... น.</span>
                 </div>
             </div>
         @endforeach
