@@ -114,6 +114,107 @@ class DoctorController extends Controller
         ));
     }
 
+    /**
+     * ตรวจสอบประวัติการได้รับยาเคมีบำบัดและคำนวณ Cycle ถัดไปอัตโนมัติตาม HN และสูตรยา
+     */
+    public function patientHistory(Request $request)
+    {
+        $hn = trim((string) $request->query('hn', ''));
+        $regCode = trim((string) $request->query('reg_code', ''));
+
+        if ($hn === '') {
+            return response()->json([
+                'found'      => false,
+                'next_cycle' => 1,
+            ]);
+        }
+
+        $orders = OrderHeader::where('or_hn', $hn)
+            ->orderByDesc('or_date')
+            ->orderByDesc('or_id')
+            ->get([
+                'or_id', 'or_hn', 'or_patname', 'or_age', 'or_sex',
+                'or_wt', 'or_ht', 'or_scr', 'or_bsa', 'or_gfr',
+                'or_ward', 'or_reg_code', 'or_cycle', 'or_date',
+                'or_adjust_percent', 'or_adjust_reason',
+            ]);
+
+        if ($orders->isEmpty()) {
+            return response()->json([
+                'found'      => false,
+                'hn'         => $hn,
+                'next_cycle' => 1,
+                'message'    => 'ไม่พบประวัติการรับยาเคมีบำบัดเดิม (ผู้ป่วยรายใหม่ -> เริ่ม Cycle #1)',
+            ]);
+        }
+
+        $latest = $orders->first();
+
+        // คำนวณ Cycle ถัดไปแยกตามแต่ละสูตรยาที่ผู้ป่วยเคยได้รับ
+        $cyclesByRegimen = $orders->groupBy(fn ($o) => strtoupper((string) $o->or_reg_code))
+            ->map(function ($group) {
+                $maxCycle = (int) $group->max('or_cycle');
+                $latestInReg = $group->first();
+                return [
+                    'reg_code'   => $latestInReg->or_reg_code,
+                    'last_cycle' => $maxCycle,
+                    'next_cycle' => $maxCycle + 1,
+                    'last_date'  => Carbon::parse($latestInReg->or_date)->format('d/m/Y'),
+                    'count'      => $group->count(),
+                ];
+            });
+
+        $targetRegKey = strtoupper($regCode);
+        if ($targetRegKey !== '' && $targetRegKey !== 'CUSTOM' && $cyclesByRegimen->has($targetRegKey)) {
+            $regInfo = $cyclesByRegimen->get($targetRegKey);
+            $nextCycle = $regInfo['next_cycle'];
+            $lastCycle = $regInfo['last_cycle'];
+            $matchedRegCode = $regInfo['reg_code'];
+            $lastDate = $regInfo['last_date'];
+        } elseif ($targetRegKey !== '' && $targetRegKey !== 'CUSTOM' && !$cyclesByRegimen->has($targetRegKey)) {
+            // เลือกสูตรยาใหม่ที่ผู้ป่วยยังไม่เคยได้รับมาก่อน -> เริ่ม Cycle 1 สำหรับสูตรนี้
+            $nextCycle = 1;
+            $lastCycle = 0;
+            $matchedRegCode = $regCode;
+            $lastDate = null;
+        } else {
+            // ยังไม่ได้เลือกสูตรยา -> อ้างอิงจากคำสั่งล่าสุดของผู้ป่วย
+            $maxLatestRegCycle = (int) $orders->where('or_reg_code', $latest->or_reg_code)->max('or_cycle');
+            $nextCycle = max(1, $maxLatestRegCycle) + 1;
+            $lastCycle = $maxLatestRegCycle;
+            $matchedRegCode = $latest->or_reg_code;
+            $lastDate = Carbon::parse($latest->or_date)->format('d/m/Y');
+        }
+
+        return response()->json([
+            'found'             => true,
+            'hn'                => $latest->or_hn,
+            'patient'           => [
+                'or_patname' => $latest->or_patname,
+                'or_age'     => $latest->or_age,
+                'or_sex'     => $latest->or_sex,
+                'or_wt'      => (float) $latest->or_wt,
+                'or_ht'      => (float) $latest->or_ht,
+                'or_scr'     => (float) $latest->or_scr,
+                'or_ward'    => $latest->or_ward,
+                'last_reg'   => $latest->or_reg_code,
+                'last_cycle' => (int) $latest->or_cycle,
+                'last_date'  => Carbon::parse($latest->or_date)->format('d/m/Y'),
+            ],
+            'matched_reg_code'  => $matchedRegCode,
+            'last_cycle'        => $lastCycle,
+            'next_cycle'        => $nextCycle,
+            'last_date'         => $lastDate,
+            'cycles_by_regimen' => $cyclesByRegimen->values(),
+            'history'           => $orders->take(5)->map(fn ($o) => [
+                'or_id'       => $o->or_id,
+                'or_date'     => Carbon::parse($o->or_date)->format('d/m/Y'),
+                'or_reg_code' => $o->or_reg_code,
+                'or_cycle'    => (int) $o->or_cycle,
+            ])->values(),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

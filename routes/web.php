@@ -54,6 +54,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:superadmin,admin,doctor')->prefix('doctor')->name('doctor.')->group(function () {
         Route::get('/', [DoctorController::class, 'index'])->name('index');
         Route::get('/create', [DoctorController::class, 'create'])->name('create');
+        Route::get('/patient-history', [DoctorController::class, 'patientHistory'])->name('patient-history');
         Route::post('/store', [DoctorController::class, 'store'])->name('store');
         Route::get('/order/{orId}', [DoctorController::class, 'show'])->name('show');
     });

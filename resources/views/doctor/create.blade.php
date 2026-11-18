@@ -55,7 +55,15 @@
             <div class="row g-3">
                 <div class="col-md-2">
                     <label class="form-label fw-semibold small">HN <span class="text-danger">*</span></label>
-                    <input type="text" name="or_hn" id="or_hn" class="form-control fw-bold" value="{{ old('or_hn') }}" placeholder="เช่น 6701234" maxlength="10" required>
+                    <div class="input-group">
+                        <input type="text" name="or_hn" id="or_hn" class="form-control fw-bold border-primary"
+                               value="{{ old('or_hn') }}" placeholder="เช่น 6701122" maxlength="10"
+                               oninput="onHnInputChange(this.value)"
+                               onblur="checkPatientCycleHistory(false)" required>
+                        <button type="button" class="btn btn-outline-primary px-2" onclick="checkPatientCycleHistory(true)" title="ค้นหาประวัติและเช็ค Cycle ล่าสุดของผู้ป่วย">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small">ชื่อ-นามสกุลผู้ป่วย <span class="text-danger">*</span></label>
@@ -110,8 +118,15 @@
                     <input type="date" name="or_date" id="or_date" class="form-control calc-trigger" value="{{ old('or_date', date('Y-m-d')) }}" required>
                 </div>
                 <div class="col-md-1">
-                    <label class="form-label fw-semibold small">Cycle ที่</label>
-                    <input type="number" name="or_cycle" id="or_cycle" class="form-control" value="{{ old('or_cycle', 1) }}" min="1" max="99" required>
+                    <label class="form-label fw-semibold small d-flex justify-content-between align-items-center">
+                        <span>Cycle ที่</span>
+                        <span id="cycleAutoBadge" class="badge bg-info text-dark" style="font-size: 0.62rem; display: none;">Auto</span>
+                    </label>
+                    <input type="number" name="or_cycle" id="or_cycle"
+                           class="form-control fw-bold text-primary text-center border-primary"
+                           value="{{ old('or_cycle', 1) }}" min="1" max="99"
+                           data-manual="false"
+                           oninput="onCycleManualEdit(this)" required>
                 </div>
 
                 <!-- กล่องแสดงผลคำนวณ BSA และ GFR อัตโนมัติ -->
@@ -131,6 +146,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- แถบแสดงประวัติการให้ยาและ Cycle อัตโนมัติจากฐานข้อมูล -->
+            <div id="cycleHistoryBanner" class="mt-3 p-2 px-3 rounded-3 border border-info bg-info-subtle small" style="display: none;"></div>
         </div>
     </div>
 
@@ -435,6 +453,7 @@
 
         renderMedTable();
         recalculateAllRows();
+        checkPatientCycleHistory(false);
     }
 
     function addCustomMedicationRow() {
@@ -472,6 +491,7 @@
 
         renderMedTable();
         recalculateAllRows();
+        checkPatientCycleHistory(false);
     }
 
     function toggleItemOff(idx) {
@@ -1012,13 +1032,157 @@
         input.focus();
     }
 
+    const PATIENT_HISTORY_URL = @json(route('doctor.patient-history'));
+    let hnLookupTimer = null;
+
+    function onHnInputChange(val) {
+        clearTimeout(hnLookupTimer);
+        const hn = (val || '').trim();
+        if (hn.length < 3) {
+            const banner = document.getElementById('cycleHistoryBanner');
+            if (banner) banner.style.display = 'none';
+            return;
+        }
+        hnLookupTimer = setTimeout(() => {
+            checkPatientCycleHistory(false);
+        }, 400);
+    }
+
+    function onCycleManualEdit(input) {
+        input.setAttribute('data-manual', 'true');
+        const badge = document.getElementById('cycleAutoBadge');
+        if (badge) {
+            badge.style.display = 'inline-block';
+            badge.className = 'badge bg-warning text-dark';
+            badge.innerText = 'แก้ไขเอง';
+        }
+    }
+
+    function applySuggestedCycle(cycleNum, autoSelectRegCode) {
+        const cycleEl = document.getElementById('or_cycle');
+        if (cycleEl) {
+            cycleEl.value = cycleNum;
+            cycleEl.setAttribute('data-manual', 'false');
+        }
+        const badge = document.getElementById('cycleAutoBadge');
+        if (badge) {
+            badge.style.display = 'inline-block';
+            badge.className = 'badge bg-info text-dark';
+            badge.innerText = 'Auto';
+        }
+
+        if (autoSelectRegCode) {
+            const matchedOpt = allRegimenOptions.find(o => o.code.toUpperCase() === autoSelectRegCode.toUpperCase());
+            if (matchedOpt) {
+                selectRegimenFromSearch(matchedOpt.value);
+            }
+        }
+    }
+
+    function checkPatientCycleHistory(forceFillPatient) {
+        const hnEl = document.getElementById('or_hn');
+        const hn = hnEl ? hnEl.value.trim() : '';
+        const regCodeEl = document.getElementById('or_reg_code');
+        const regCode = regCodeEl ? regCodeEl.value.trim() : '';
+        const banner = document.getElementById('cycleHistoryBanner');
+        const cycleEl = document.getElementById('or_cycle');
+        const badge = document.getElementById('cycleAutoBadge');
+
+        if (!hn) {
+            if (banner) banner.style.display = 'none';
+            return;
+        }
+
+        const url = `${PATIENT_HISTORY_URL}?hn=${encodeURIComponent(hn)}&reg_code=${encodeURIComponent(regCode)}`;
+
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (!data.found) {
+                if (cycleEl && cycleEl.getAttribute('data-manual') !== 'true') {
+                    cycleEl.value = 1;
+                }
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.className = 'badge bg-secondary text-white';
+                    badge.innerText = 'New';
+                }
+                if (banner) {
+                    banner.className = 'mt-3 p-2 px-3 rounded-3 border border-secondary-subtle bg-light small text-secondary';
+                    banner.innerHTML = `<i class="bi bi-info-circle me-1"></i> ไม่พบประวัติการรับยาเคมีบำบัดเดิมของ HN <strong>${hn}</strong> &mdash; ระบบตั้งค่าเริ่มต้นเป็น <strong>Cycle #1</strong> (แพทย์สามารถแก้ไขตัวเลข Cycle ได้)`;
+                    banner.style.display = 'block';
+                }
+                return;
+            }
+
+            // เติมข้อมูลผู้ป่วยอัตโนมัติหากยังว่างอยู่ หรือกดปุ่มค้นหาโดยตรง
+            const patNameEl = document.getElementById('or_patname');
+            if (data.patient && (forceFillPatient || !patNameEl.value.trim())) {
+                patNameEl.value = data.patient.or_patname || '';
+                if (data.patient.or_age) document.getElementById('or_age').value = data.patient.or_age;
+                if (data.patient.or_sex) document.getElementById('or_sex').value = data.patient.or_sex;
+                if (data.patient.or_wt)  document.getElementById('or_wt').value = data.patient.or_wt;
+                if (data.patient.or_ht)  document.getElementById('or_ht').value = data.patient.or_ht;
+                if (data.patient.or_scr) document.getElementById('or_scr').value = data.patient.or_scr;
+                if (data.patient.or_ward) document.getElementById('or_ward').value = data.patient.or_ward;
+                calculateBsaAndGfr();
+            }
+
+            // อัปเดตช่อง Cycle อัตโนมัติ (หากแพทย์ยังไม่ได้ล็อกค่าที่แก้ไขเอง หรือกดปุ่มค้นหา)
+            if (cycleEl && (forceFillPatient || cycleEl.getAttribute('data-manual') !== 'true')) {
+                cycleEl.value = data.next_cycle || 1;
+                cycleEl.setAttribute('data-manual', 'false');
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.className = 'badge bg-info text-dark';
+                    badge.innerText = 'Auto';
+                }
+            }
+
+            if (banner) {
+                const histTags = (data.history || []).map(h =>
+                    `<span class="badge bg-white text-dark border me-1">${h.or_reg_code} Cycle #${h.or_cycle} (${h.or_date})</span>`
+                ).join('');
+
+                const regSummary = data.last_cycle > 0
+                    ? `เคยได้รับสูตร <strong>${data.matched_reg_code}</strong> ล่าสุด <strong>Cycle #${data.last_cycle}</strong> (เมื่อ ${data.last_date}) &rarr; ระบบกำหนดรอบนี้เป็น <span class="badge bg-primary fs-6">Cycle #${data.next_cycle}</span>`
+                    : `ผู้ป่วยมีประวัติเดิม (${data.patient.last_reg} Cycle #${data.patient.last_cycle}) แต่เริ่มสูตรใหม่ <strong>${data.matched_reg_code}</strong> เป็นครั้งแรก &rarr; เริ่ม <span class="badge bg-primary fs-6">Cycle #1</span>`;
+
+                banner.className = 'mt-3 p-2 px-3 rounded-3 border border-info bg-info-subtle small text-dark';
+                banner.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div>
+                            <i class="bi bi-clock-history text-primary me-1"></i>
+                            <strong>ตรวจสอบประวัติผู้ป่วย [${data.hn}] ${data.patient.or_patname}:</strong>
+                            ${regSummary}
+                            <span class="text-secondary ms-1">(สามารถแก้ไขช่อง Cycle ที่ ได้ตามต้องการ)</span>
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn btn-xs btn-primary btn-sm py-0 px-2"
+                                onclick="applySuggestedCycle(${data.next_cycle}, '${data.matched_reg_code || ''}')">
+                                <i class="bi bi-magic me-1"></i> ใช้สูตร ${data.matched_reg_code} (Cycle #${data.next_cycle})
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-1 pt-1 border-top border-info-subtle text-secondary">
+                        <strong class="me-1">ประวัติย้อนหลัง:</strong> ${histTags}
+                    </div>
+                `;
+                banner.style.display = 'block';
+            }
+        })
+        .catch(() => {});
+    }
+
     function fillDemoPatient() {
         const demoPatients = [
+            { hn: '6701122', name: 'นาย กิตติพงศ์ ใจดี', age: 58, sex: 'M', wt: 62.0, ht: 168, scr: 0.95, ward: '000' },
             { hn: '6708412', name: 'นาย วิชัย ใจสู้ดี', age: 62, sex: 'M', wt: 64.5, ht: 168, scr: 1.05, ward: '000' },
             { hn: '6709105', name: 'นาง มาลี ศรีสุข', age: 54, sex: 'F', wt: 56.0, ht: 158, scr: 0.85, ward: '002' },
-            { hn: '6703329', name: 'นาย สมศักดิ์ รักษ์สุขภาพ', age: 68, sex: 'M', wt: 58.0, ht: 164, scr: 1.35, ward: '001' },
         ];
-        const p = demoPatients[Math.floor(Math.random() * demoPatients.length)];
+        const p = demoPatients[0];
         document.getElementById('or_hn').value = p.hn;
         document.getElementById('or_patname').value = p.name;
         document.getElementById('or_age').value = p.age;
@@ -1027,13 +1191,16 @@
         document.getElementById('or_ht').value = p.ht;
         document.getElementById('or_scr').value = p.scr;
         document.getElementById('or_ward').value = p.ward;
+        document.getElementById('or_cycle').setAttribute('data-manual', 'false');
 
         calculateBsaAndGfr();
 
         const regSelect = document.getElementById('regimenSelect');
-        if (!regSelect.value && regSelect.options.length > 1) {
-            regSelect.selectedIndex = 1;
+        if (!regSelect.value && regSelect.options.length > 2) {
+            regSelect.selectedIndex = 2;
             onRegimenChange();
+        } else {
+            checkPatientCycleHistory(true);
         }
     }
 
