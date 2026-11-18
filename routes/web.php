@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DoctorController;
+use App\Http\Controllers\MedcytoController;
 use App\Http\Controllers\NurseController;
 use App\Http\Controllers\PharmacistController;
 use App\Http\Controllers\RegimenController;
+use App\Models\Medcyto;
 use App\Models\OncDayRecord;
 use App\Models\OrderHeader;
 use App\Models\RegimenHeader;
@@ -34,6 +36,7 @@ Route::middleware('auth')->group(function () {
             'orders_pending'   => OrderHeader::where('or_confirm', 0)->count(),
             'orders_confirmed' => OrderHeader::where('or_confirm', 1)->count(),
             'regimens_count'   => RegimenHeader::where('rh_used', 1)->count(),
+            'meds_count'       => Medcyto::count(),
             'today_doses'      => OncDayRecord::whereDate('or_daterec', today())->count(),
             'users_count'      => User::count(),
         ];
@@ -78,5 +81,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [RegimenController::class, 'index'])->name('index');
         Route::post('/', [RegimenController::class, 'store'])->name('store');
         Route::delete('/{rhId}', [RegimenController::class, 'destroy'])->name('destroy');
+    });
+
+    // 6. MEDCYTO MASTER DATA (Accessible by superadmin and admin ONLY)
+    Route::middleware('role:superadmin,admin')->prefix('medcyto')->name('medcyto.')->group(function () {
+        Route::get('/', [MedcytoController::class, 'index'])->name('index');
+        Route::post('/', [MedcytoController::class, 'store'])->name('store');
+        Route::put('/{dgCode}', [MedcytoController::class, 'update'])->name('update');
+        Route::delete('/{dgCode}', [MedcytoController::class, 'destroy'])->name('destroy');
     });
 });

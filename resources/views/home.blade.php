@@ -119,9 +119,15 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h6 class="fw-bold text-dark mb-1"><i class="bi bi-journal-medical me-1 text-primary"></i> การจัดการข้อมูลหลักสำหรับผู้ดูแลระบบ (Admin &amp; Superadmin)</h6>
-                <p class="small text-secondary mb-0">จัดการสูตรยาเคมีบำบัดมาตรฐาน (Regimen: <code>reg_h</code> &amp; <code>reg_d</code>) ปัจจุบันมี {{ $stats['regimens_count'] }} สูตรยา</p>
+                <p class="small text-secondary mb-0">
+                    จัดการบัญชียาเคมีบำบัด (<code>medcyto</code>: {{ $stats['meds_count'] ?? 0 }} รายการ)
+                    และสูตรยาเคมีบำบัดมาตรฐาน (Regimen: <code>reg_h</code> &amp; <code>reg_d</code>: {{ $stats['regimens_count'] }} สูตรยา)
+                </p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('medcyto.index') }}" class="btn btn-danger btn-sm fw-semibold">
+                    <i class="bi bi-capsule me-1"></i> จัดการยาเคมีบำบัด (medcyto)
+                </a>
                 <a href="{{ route('regimens.index') }}" class="btn btn-dark btn-sm fw-semibold">
                     <i class="bi bi-journal-medical me-1"></i> จัดการสูตรยา Regimen
                 </a>

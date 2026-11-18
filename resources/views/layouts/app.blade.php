@@ -102,6 +102,11 @@
 
                     @if(auth()->user()->isAdmin())
                         <li class="nav-item">
+                            <a class="nav-link nav-pill-role {{ request()->routeIs('medcyto.*') ? 'active' : '' }}" href="{{ route('medcyto.index') }}">
+                                <i class="bi bi-capsule me-1"></i> จัดการยาเคมีบำบัด (medcyto)
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link nav-pill-role {{ request()->routeIs('regimens.*') ? 'active' : '' }}" href="{{ route('regimens.index') }}">
                                 <i class="bi bi-journal-medical me-1"></i> จัดการสูตรยา Regimen
                             </a>
