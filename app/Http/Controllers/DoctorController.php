@@ -21,7 +21,11 @@ class DoctorController extends Controller
 {
     public function index(Request $request)
     {
+        // แสดงเฉพาะคำสั่งใช้ยาตามวันที่ที่เลือก (ค่าเริ่มต้น = วันที่ปัจจุบัน)
+        $selectedDate = $request->input('date') ?: today()->format('Y-m-d');
+
         $query = OrderHeader::with(['details.medication', 'details.unit', 'details.solution', 'ward'])
+            ->whereDate('or_date', $selectedDate)
             ->orderByDesc('or_date')
             ->orderByDesc('or_id');
 
@@ -46,13 +50,13 @@ class DoctorController extends Controller
         $orders = $query->paginate(15)->withQueryString();
 
         $stats = [
-            'total'     => OrderHeader::count(),
-            'pending'   => OrderHeader::where('or_confirm', 0)->count(),
-            'confirmed' => OrderHeader::where('or_confirm', 1)->count(),
+            'total'     => OrderHeader::whereDate('or_date', $selectedDate)->count(),
+            'pending'   => OrderHeader::whereDate('or_date', $selectedDate)->where('or_confirm', 0)->count(),
+            'confirmed' => OrderHeader::whereDate('or_date', $selectedDate)->where('or_confirm', 1)->count(),
             'today'     => OrderHeader::whereDate('or_date', today())->count(),
         ];
 
-        return view('doctor.index', compact('orders', 'stats'));
+        return view('doctor.index', compact('orders', 'stats', 'selectedDate'));
     }
 
     public function create()
