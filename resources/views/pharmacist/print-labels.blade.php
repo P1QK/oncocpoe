@@ -262,10 +262,14 @@
                 </table>
             </div>
 
-            <div class="d-flex justify-content-between sticker-footer text-secondary">
-                <span>ผู้ส่ง: .........................</span>
-                <span>ผู้รับ: .........................</span>
-                <span>เวลา: .......... น.</span>
+            <div class="d-flex justify-content-between align-items-end sticker-footer text-secondary">
+                <div style="font-size: 8px; line-height: 1.25;">
+                    <div>ผู้ส่ง: .............................. ผู้รับ: ..............................</div>
+                    <div>เวลาส่งมอบ: .............. น.</div>
+                </div>
+                <div class="text-end">
+                    <svg class="or-id-barcode" data-code="{{ $order->or_id }}" style="max-height: 28px; width: auto;"></svg>
+                </div>
             </div>
         </div>
 
@@ -327,5 +331,64 @@
     @endforeach
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+    const CODE39_MAP = {
+        '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw',
+        '5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn',
+        'A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn',
+        'F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn',
+        'K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn',
+        'P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn',
+        'U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn',
+        'Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','*':'nwnnwnwnn'
+    };
+
+    function renderFallbackCode39(svgEl, text) {
+        const encoded = `*${String(text).toUpperCase()}*`;
+        let x = 2;
+        const barH = 17;
+        let rects = '';
+        for (let i = 0; i < encoded.length; i++) {
+            const pattern = CODE39_MAP[encoded[i]] || CODE39_MAP['-'];
+            for (let j = 0; j < 9; j++) {
+                const w = pattern[j] === 'w' ? 2.2 : 1;
+                if (j % 2 === 0) {
+                    rects += `<rect x="${x}" y="1" width="${w}" height="${barH}" fill="#000"/>`;
+                }
+                x += w;
+            }
+            x += 1;
+        }
+        const totalW = x + 2;
+        svgEl.setAttribute('viewBox', `0 0 ${totalW} 27`);
+        svgEl.setAttribute('width', Math.min(totalW, 135));
+        svgEl.setAttribute('height', '27');
+        svgEl.innerHTML = `${rects}<text x="${totalW / 2}" y="25.5" text-anchor="middle" font-family="monospace" font-size="7.5" font-weight="bold" fill="#000">${text}</text>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.or-id-barcode').forEach(svgEl => {
+            const code = svgEl.getAttribute('data-code') || '';
+            if (!code) return;
+            if (typeof JsBarcode === 'function') {
+                try {
+                    JsBarcode(svgEl, code, {
+                        format: 'CODE128',
+                        width: 1.15,
+                        height: 17,
+                        displayValue: true,
+                        fontSize: 8.5,
+                        fontOptions: 'bold',
+                        textMargin: 1,
+                        margin: 0
+                    });
+                    return;
+                } catch (e) {}
+            }
+            renderFallbackCode39(svgEl, code);
+        });
+    });
+</script>
 </body>
 </html>
