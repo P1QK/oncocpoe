@@ -333,6 +333,7 @@
 
     function syncInputsToState() {
         currentItems.forEach((item, idx) => {
+            const ordEl = document.getElementById(`orderno_${idx}`);
             const solEl = document.querySelector(`[name="items[${idx}][soln]"]`);
             const volEl = document.getElementById(`solvol_${idx}`);
             const rtEl  = document.querySelector(`[name="items[${idx}][medroute]"]`);
@@ -341,6 +342,7 @@
             const durEl = document.getElementById(`duration_${idx}`);
             const redEl = document.getElementById(`reduce_pct_${idx}`);
 
+            if (ordEl) item.orderno = parseInt(ordEl.value) || (idx + 1);
             if (solEl) item.soln = solEl.value;
             if (volEl) item.solvol = parseFloat(volEl.value) || 0;
             if (rtEl)  item.medroute = rtEl.value;
@@ -409,7 +411,8 @@
         const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
         const reg = REGIMENS_DATA[rhId];
 
-        currentItems = reg.items.map((item) => ({
+        currentItems = reg.items.map((item, idx) => ({
+            orderno: item.rd_orderno || (idx + 1),
             medcode: item.rd_medcode,
             dg_name: item.dg_name,
             dg_conc: item.dg_conc,
@@ -446,6 +449,7 @@
         const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
 
         currentItems.push({
+            orderno: currentItems.length + 1,
             medcode: defaultMed.dg_code,
             dg_name: defaultMed.dg_name,
             dg_conc: parseFloat(defaultMed.dg_conc) || 1,
@@ -583,11 +587,15 @@
                                 <i class="bi ${isOff ? 'bi-toggle-off' : 'bi-toggle-on'} me-1"></i>${isOff ? 'OFF (งด)' : 'ON (สั่ง)'}
                             </button>
                             ${item.is_custom ? `
+                                <input type="hidden" name="items[${idx}][orderno]" id="orderno_${idx}" value="${item.orderno || (idx + 1)}" ${disabledAttr}>
                                 <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0 px-2 w-100" style="font-size: 0.7rem;"
                                     onclick="removeCustomItem(${idx})">
                                     <i class="bi bi-trash"></i> ลบแถว
                                 </button>
-                            ` : `<small class="text-muted" style="font-size: 0.68rem;">ลำดับ #${idx + 1}</small>`}
+                            ` : `
+                                <input type="hidden" name="items[${idx}][orderno]" id="orderno_${idx}" value="${item.orderno || (idx + 1)}" ${disabledAttr}>
+                                <span class="badge bg-warning-subtle text-dark border border-warning" style="font-size: 0.7rem;">ลำดับให้ยา #${item.orderno || (idx + 1)}</span>
+                            `}
                         </div>
                     </td>
                     <td>

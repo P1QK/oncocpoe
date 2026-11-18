@@ -229,7 +229,7 @@
                 <table class="table table-bordered summary-table mb-0">
                     <thead class="table-light text-center">
                         <tr>
-                            <th style="width: 16px;">#</th>
+                            <th style="width: 30px;">ลำดับ</th>
                             <th>ชื่อยา</th>
                             <th>ขนาด</th>
                             <th>สารน้ำ/รวม</th>
@@ -238,10 +238,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($dayItems as $dItem)
+                        @foreach($dayItems->sortBy('or_orderno')->values() as $dIdx => $dItem)
                             <tr>
-                                <td class="text-center fw-bold">{{ $dItem->or_orderno }}</td>
-                                <td class="fw-bold text-danger text-truncate" style="max-width: 72px;">
+                                <td class="text-center fw-bold text-primary text-nowrap">{{ $dIdx + 1 }}/{{ $dayItems->count() }}</td>
+                                <td class="fw-bold text-danger text-truncate" style="max-width: 70px;">
                                     {{ optional($dItem->medication)->dg_name ?? $dItem->or_medcode }}
                                 </td>
                                 <td class="text-end fw-bold text-nowrap">
@@ -270,10 +270,13 @@
         </div>
 
         <!-- 2. สติกเกอร์ยารายขวด/ถุง ของคนไข้ในวันนั้น (ขนาด 9 cm x 7 cm) -->
-        @foreach($dayItems->values() as $itemIdx => $lbl)
+        @foreach($dayItems->sortBy('or_orderno')->values() as $itemIdx => $lbl)
+            @php
+                $seqText = ($itemIdx + 1) . '/' . $dayItems->count();
+            @endphp
             <div class="chemo-label-card">
                 <div class="d-flex justify-content-between align-items-center chemo-banner mb-1">
-                    <span><i class="bi bi-radioactive me-1"></i> ยาเคมีบำบัด (ขวดที่ {{ $itemIdx + 1 }}/{{ $dayItems->count() }})</span>
+                    <span><i class="bi bi-radioactive me-1"></i> ลำดับการให้ยา: {{ $seqText }}</span>
                     <span>{{ \Carbon\Carbon::parse($lbl->or_daterec)->format('d/m/Y') }} ({{ $lbl->or_text }})</span>
                 </div>
 
@@ -291,7 +294,7 @@
                 <div class="drug-box">
                     <div class="d-flex justify-content-between align-items-baseline">
                         <div class="drug-title text-danger text-truncate pe-1">
-                            {{ $lbl->or_orderno }}. {{ optional($lbl->medication)->dg_name ?? $lbl->or_medcode }}
+                            <span class="badge bg-danger me-1" style="font-size: 9px;">{{ $seqText }}</span>{{ optional($lbl->medication)->dg_name ?? $lbl->or_medcode }}
                         </div>
                         <div class="drug-dose text-dark text-nowrap">
                             {{ number_format($lbl->or_meddose, 2) }} {{ optional($lbl->unit)->un_unit ?? 'mg' }}

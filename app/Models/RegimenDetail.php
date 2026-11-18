@@ -14,6 +14,7 @@ class RegimenDetail extends Model
 
     protected $fillable = [
         'rd_id',
+        'rd_orderno',
         'rd_medcode',
         'rd_meddose',
         'rd_medunit',

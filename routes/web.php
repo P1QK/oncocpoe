@@ -64,6 +64,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/poll', [PharmacistController::class, 'poll'])->name('poll');
         Route::get('/stickers', [PharmacistController::class, 'dailyStickers'])->name('stickers');
         Route::get('/order/{orId}', [PharmacistController::class, 'show'])->name('show');
+        Route::post('/order/{orId}/sequence', [PharmacistController::class, 'updateSequence'])->name('sequence');
         Route::post('/order/{orId}/confirm', [PharmacistController::class, 'confirm'])->name('confirm');
         Route::post('/order/{orId}/day-status', [PharmacistController::class, 'updateDayStatus'])->name('day-status');
         Route::get('/order/{orId}/print/working-formula', [PharmacistController::class, 'workingFormula'])->name('print.working-formula');
@@ -80,6 +81,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:superadmin,admin')->prefix('regimens')->name('regimens.')->group(function () {
         Route::get('/', [RegimenController::class, 'index'])->name('index');
         Route::post('/', [RegimenController::class, 'store'])->name('store');
+        Route::post('/{rhId}/sequence', [RegimenController::class, 'updateSequence'])->name('sequence');
         Route::delete('/{rhId}', [RegimenController::class, 'destroy'])->name('destroy');
     });
 

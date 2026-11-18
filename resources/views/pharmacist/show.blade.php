@@ -14,15 +14,17 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         @if($order->or_confirm == 0)
-            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}">
+            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="syncSequencesBeforeConfirm(this)">
                 @csrf
+                <div id="confirmHiddenSequences"></div>
                 <button type="submit" class="btn btn-success fw-bold shadow-sm">
                     <i class="bi bi-check2-all me-1"></i> Confirm รับคำสั่งใช้ยา &amp; แตกคำสั่งรายวัน
                 </button>
             </form>
         @else
-            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" onsubmit="return confirm('ต้องการคำนวณและแตกคำสั่งรายวันใหม่อีกครั้งหรือไม่?');">
+            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="if(!confirm('ต้องการคำนวณและแตกคำสั่งรายวันใหม่อีกครั้งหรือไม่?')) return false; syncSequencesBeforeConfirm(this);">
                 @csrf
+                <div id="confirmHiddenSequences"></div>
                 <button type="submit" class="btn btn-outline-success">
                     <i class="bi bi-arrow-repeat me-1"></i> แตกคำสั่งรายวันใหม่
                 </button>
@@ -106,69 +108,96 @@
 
 <!-- ตารางที่ 1: รายการคำสั่งใช้ยาหลัก (order_d) -->
 <div class="card card-medical bg-white mb-4">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-        <span class="fw-bold"><i class="bi bi-prescription2 text-primary me-1"></i> 1. รายการยาตามคำสั่งแพทย์ (ตาราง <code>order_d</code>)</span>
-        <span class="badge bg-secondary">{{ $order->details->count() }} รายการยา</span>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-bordered align-middle mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th class="text-center">#</th>
-                    <th>รหัส / ชื่อยาเคมีบำบัด (ความเข้มข้น)</th>
-                    <th class="text-end">ขนาดยาสุทธิ (mg)</th>
-                    <th class="text-end bg-warning-subtle">ปริมาตรยาที่ดูด (mL)</th>
-                    <th>สารน้ำ &amp; ปริมาตรเริ่มต้น</th>
-                    <th class="text-end">ปริมาตรรวม (Total Vol)</th>
-                    <th>วิถีทาง / เวลาให้ยา</th>
-                    <th class="text-center">จำนวนวัน</th>
-                    <th class="text-center">ช่วงวันที่ให้ยา (or_start - or_stop)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($order->details as $d)
-                    @php
-                        $days = \Carbon\Carbon::parse($d->or_start)->diffInDays(\Carbon\Carbon::parse($d->or_stop)) + 1;
-                    @endphp
+    <form method="POST" action="{{ route('pharmacist.sequence', $order->or_id) }}">
+        @csrf
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="fw-bold"><i class="bi bi-prescription2 text-primary me-1"></i> 1. รายการยาตามคำสั่งแพทย์ (ตาราง <code>order_d</code>)</span>
+                @if(!$hasRegimen)
+                    <span class="badge bg-warning text-dark ms-2">
+                        <i class="bi bi-sort-numeric-down me-1"></i>คำสั่งยาแบบอิสระ (ไม่มี Regimen) &mdash; กรุณาระบุลำดับการให้ยาด้านล่าง
+                    </span>
+                @else
+                    <span class="badge bg-info-subtle text-dark border ms-2">
+                        ลำดับการให้ยาอ้างอิงตามสูตร Regimen ({{ $order->or_reg_code }})
+                    </span>
+                @endif
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="submit" class="btn btn-sm {{ !$hasRegimen ? 'btn-warning fw-bold shadow-sm' : 'btn-outline-primary fw-semibold' }}">
+                    <i class="bi bi-sort-numeric-down me-1"></i> บันทึกลำดับการให้ยา
+                </button>
+                <span class="badge bg-secondary">{{ $order->details->count() }} รายการยา</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle mb-0">
+                <thead class="table-light">
                     <tr>
-                        <td class="text-center fw-bold">{{ $d->or_orderno }}</td>
-                        <td>
-                            <div class="fw-bold text-primary">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
-                            <small class="text-secondary">
-                                ความเข้มข้น: <strong>{{ number_format(optional($d->medication)->dg_conc ?? 1, 2) }} mg/mL</strong>
-                                @if(($d->or_reduce_pct ?? 0) > 0)
-                                    | <span class="text-danger fw-semibold">ลด {{ number_format($d->or_reduce_pct, 0) }}% จาก {{ number_format($d->or_std_dose, 2) }} mg</span>
-                                @endif
-                            </small>
-                        </td>
-                        <td class="text-end fw-bold text-danger fs-5">
-                            {{ number_format($d->or_meddose, 2) }} {{ optional($d->unit)->un_unit ?? 'mg' }}
-                        </td>
-                        <td class="text-end fw-bold bg-warning-subtle fs-5 text-dark">
-                            {{ number_format($d->or_working, 2) }} mL
-                        </td>
-                        <td>
-                            {{ optional($d->solution)->so_name ?? $d->or_soln }}
-                            <strong>{{ number_format($d->or_solvol, 0) }} mL</strong>
-                        </td>
-                        <td class="text-end fw-semibold">
-                            {{ number_format($d->or_totalvol, 2) }} mL
-                        </td>
-                        <td>
-                            <div>{{ optional($d->route)->rt_name ?? $d->or_medroute }}</div>
-                            <small class="text-primary fw-semibold">{{ optional($d->timing)->tm_time ?? $d->or_medtime }}</small>
-                        </td>
-                        <td class="text-center">
-                            <span class="badge bg-info text-dark fs-6">{{ $days }} วัน</span>
-                        </td>
-                        <td class="text-center fw-semibold">
-                            {{ \Carbon\Carbon::parse($d->or_start)->format('d/m/Y') }} &ndash; {{ \Carbon\Carbon::parse($d->or_stop)->format('d/m/Y') }}
-                        </td>
+                        <th class="text-center bg-warning-subtle" style="width: 110px;">
+                            ลำดับการให้ยา<br><small class="text-secondary">(<code>or_orderno</code>)</small>
+                        </th>
+                        <th>รหัส / ชื่อยาเคมีบำบัด (ความเข้มข้น)</th>
+                        <th class="text-end">ขนาดยาสุทธิ (mg)</th>
+                        <th class="text-end bg-warning-subtle">ปริมาตรยาที่ดูด (mL)</th>
+                        <th>สารน้ำ &amp; ปริมาตรเริ่มต้น</th>
+                        <th class="text-end">ปริมาตรรวม (Total Vol)</th>
+                        <th>วิถีทาง / เวลาให้ยา</th>
+                        <th class="text-center">จำนวนวัน</th>
+                        <th class="text-center">ช่วงวันที่ให้ยา (or_start - or_stop)</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+                </thead>
+                <tbody>
+                    @foreach($order->details as $idx => $d)
+                        @php
+                            $days = \Carbon\Carbon::parse($d->or_start)->diffInDays(\Carbon\Carbon::parse($d->or_stop)) + 1;
+                        @endphp
+                        <tr>
+                            <td class="text-center bg-warning-subtle">
+                                <input type="number" min="1" max="99"
+                                       name="sequences[{{ $idx }}]"
+                                       class="form-control form-control-sm text-center fw-bold border-warning pharm-seq-input"
+                                       data-idx="{{ $idx }}"
+                                       value="{{ $d->or_orderno ?: ($idx + 1) }}" required>
+                            </td>
+                            <td>
+                                <div class="fw-bold text-primary">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
+                                <small class="text-secondary">
+                                    ความเข้มข้น: <strong>{{ number_format(optional($d->medication)->dg_conc ?? 1, 2) }} mg/mL</strong>
+                                    @if(($d->or_reduce_pct ?? 0) > 0)
+                                        | <span class="text-danger fw-semibold">ลด {{ number_format($d->or_reduce_pct, 0) }}% จาก {{ number_format($d->or_std_dose, 2) }} mg</span>
+                                    @endif
+                                </small>
+                            </td>
+                            <td class="text-end fw-bold text-danger fs-5">
+                                {{ number_format($d->or_meddose, 2) }} {{ optional($d->unit)->un_unit ?? 'mg' }}
+                            </td>
+                            <td class="text-end fw-bold bg-warning-subtle fs-5 text-dark">
+                                {{ number_format($d->or_working, 2) }} mL
+                            </td>
+                            <td>
+                                {{ optional($d->solution)->so_name ?? $d->or_soln }}
+                                <strong>{{ number_format($d->or_solvol, 0) }} mL</strong>
+                            </td>
+                            <td class="text-end fw-semibold">
+                                {{ number_format($d->or_totalvol, 2) }} mL
+                            </td>
+                            <td>
+                                <div>{{ optional($d->route)->rt_name ?? $d->or_medroute }}</div>
+                                <small class="text-primary fw-semibold">{{ optional($d->timing)->tm_time ?? $d->or_medtime }}</small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-info text-dark fs-6">{{ $days }} วัน</span>
+                            </td>
+                            <td class="text-center fw-semibold">
+                                {{ \Carbon\Carbon::parse($d->or_start)->format('d/m/Y') }} &ndash; {{ \Carbon\Carbon::parse($d->or_stop)->format('d/m/Y') }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </form>
 </div>
 
 <!-- ตารางที่ 2: รายการแตกคำสั่งใช้ยาเป็นรายวัน (onc_dayrecord) -->
@@ -261,4 +290,23 @@
         @endif
     </div>
 </div>
+@endsection
+
+@section('js_after')
+<script>
+    function syncSequencesBeforeConfirm(form) {
+        const container = form.querySelector('#confirmHiddenSequences');
+        if (!container) return;
+        container.innerHTML = '';
+
+        document.querySelectorAll('.pharm-seq-input').forEach(input => {
+            const idx = input.getAttribute('data-idx');
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = `sequences[${idx}]`;
+            hidden.value = input.value;
+            container.appendChild(hidden);
+        });
+    }
+</script>
 @endsection

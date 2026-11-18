@@ -34,6 +34,7 @@ class RegimenController extends Controller
         $validated = $request->validate([
             'rh_code'            => ['required', 'string', 'max:20'],
             'items'              => ['required', 'array', 'min:1'],
+            'items.*.rd_orderno' => ['required', 'integer', 'min:1', 'max:99'],
             'items.*.rd_medcode' => ['required', 'string', 'max:8'],
             'items.*.rd_meddose' => ['required', 'numeric', 'min:0.01'],
             'items.*.rd_medunit' => ['required', 'string', 'max:2'],
@@ -52,9 +53,14 @@ class RegimenController extends Controller
                 'rh_created' => now(),
             ]);
 
-            foreach ($validated['items'] as $item) {
+            $sortedItems = collect($validated['items'])
+                ->sortBy(fn ($item, $idx) => (int) ($item['rd_orderno'] ?? ($idx + 1)))
+                ->values();
+
+            foreach ($sortedItems as $idx => $item) {
                 RegimenDetail::create([
                     'rd_id'       => $reg->rh_id,
+                    'rd_orderno'  => (int) ($item['rd_orderno'] ?? ($idx + 1)),
                     'rd_medcode'  => $item['rd_medcode'],
                     'rd_meddose'  => $item['rd_meddose'],
                     'rd_medunit'  => $item['rd_medunit'],
@@ -68,7 +74,45 @@ class RegimenController extends Controller
             }
         });
 
-        return redirect()->route('regimens.index')->with('success', 'บันทึกสูตรยาเคมีบำบัด (Regimen) ใหม่เรียบร้อยแล้ว');
+        return redirect()->route('regimens.index')->with('success', 'บันทึกสูตรยาเคมีบำบัด (Regimen) พร้อมลำดับการให้ยาเรียบร้อยแล้ว');
+    }
+
+    /**
+     * อัปเดตลำดับการให้ยา (rd_orderno) ของสูตรยา Regimen ที่มีอยู่แล้ว
+     */
+    public function updateSequence(Request $request, $rhId)
+    {
+        $reg = RegimenHeader::with('details')->findOrFail($rhId);
+
+        $validated = $request->validate([
+            'sequences'   => ['required', 'array'],
+            'sequences.*' => ['required', 'integer', 'min:1', 'max:99'],
+        ]);
+
+        DB::transaction(function () use ($reg, $validated) {
+            $existingItems = $reg->details->values();
+            DB::table('reg_d')->where('rd_id', $reg->rh_id)->delete();
+
+            foreach ($existingItems as $idx => $item) {
+                $newSeq = (int) ($validated['sequences'][$idx] ?? $item->rd_orderno ?? ($idx + 1));
+
+                RegimenDetail::create([
+                    'rd_id'       => $reg->rh_id,
+                    'rd_orderno'  => $newSeq,
+                    'rd_medcode'  => $item->rd_medcode,
+                    'rd_meddose'  => $item->rd_meddose,
+                    'rd_medunit'  => $item->rd_medunit,
+                    'rd_sol'      => $item->rd_sol,
+                    'rd_solvol'   => $item->rd_solvol,
+                    'rd_medroute' => $item->rd_medroute,
+                    'rd_medtime'  => $item->rd_medtime,
+                    'rd_start'    => $item->rd_start,
+                    'rd_duration' => $item->rd_duration,
+                ]);
+            }
+        });
+
+        return redirect()->route('regimens.index')->with('success', "อัปเดตลำดับการให้ยาของสูตร {$reg->rh_code} เรียบร้อยแล้ว");
     }
 
     public function destroy($rhId)

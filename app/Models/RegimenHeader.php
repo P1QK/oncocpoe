@@ -19,6 +19,6 @@ class RegimenHeader extends Model
 
     public function details(): HasMany
     {
-        return $this->hasMany(RegimenDetail::class, 'rd_id', 'rh_id');
+        return $this->hasMany(RegimenDetail::class, 'rd_id', 'rh_id')->orderBy('rd_orderno');
     }
 }

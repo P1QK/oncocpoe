@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\OncDayRecord;
+use App\Models\OrderDetail;
 use App\Models\OrderHeader;
+use App\Models\RegimenHeader;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -101,17 +103,92 @@ class PharmacistController extends Controller
 
         $groupedDayRecords = $order->dayRecords->groupBy('or_daterec');
 
-        return view('pharmacist.show', compact('order', 'groupedDayRecords'));
+        $hasRegimen = !empty($order->or_reg_code)
+            && strtoupper($order->or_reg_code) !== 'CUSTOM'
+            && RegimenHeader::where('rh_code', $order->or_reg_code)->exists();
+
+        return view('pharmacist.show', compact('order', 'groupedDayRecords', 'hasRegimen'));
+    }
+
+    /**
+     * บันทึก/แก้ไขลำดับการให้ยา (or_orderno) ในหน้ารายละเอียดคำสั่งใช้ยาของเภสัชกร (กรณีไม่มี Regimen หรือปรับลำดับ)
+     */
+    public function updateSequence(Request $request, string $orId)
+    {
+        $order = OrderHeader::with(['details'])->findOrFail($orId);
+
+        $validated = $request->validate([
+            'sequences'   => ['required', 'array'],
+            'sequences.*' => ['required', 'integer', 'min:1', 'max:99'],
+        ]);
+
+        DB::transaction(function () use ($order, $validated) {
+            $existingDetails = $order->details->values();
+
+            // เก็บสถานะเตรียมยา/บริหารยาเดิมของ onc_dayrecord (กรณีเคยกด Confirm ไปแล้ว)
+            $existingDayStatus = DB::table('onc_dayrecord')
+                ->where('or_id', $order->or_id)
+                ->get()
+                ->keyBy(fn ($r) => $r->or_daterec . '|' . $r->or_orderno . '|' . $r->or_medcode);
+
+            DB::table('order_d')->where('or_id', $order->or_id)->delete();
+
+            $updatedItems = [];
+            foreach ($existingDetails as $idx => $detail) {
+                $newSeq = (int) ($validated['sequences'][$idx] ?? $detail->or_orderno ?? ($idx + 1));
+                $data = $detail->toArray();
+                $data['or_orderno'] = $newSeq;
+                $data['old_orderno'] = $detail->or_orderno;
+                $updatedItems[] = $data;
+            }
+
+            usort($updatedItems, fn ($a, $b) => $a['or_orderno'] <=> $b['or_orderno']);
+
+            foreach ($updatedItems as $item) {
+                $oldOrderNo = $item['old_orderno'];
+                unset($item['old_orderno'], $item['medication'], $item['unit'], $item['solution'], $item['route'], $item['timing']);
+                OrderDetail::create($item);
+
+                // หากเคยแตกรายวันไว้แล้ว ให้ปรับลำดับ or_orderno ใน onc_dayrecord ตามด้วย
+                if ($existingDayStatus->isNotEmpty()) {
+                    DB::table('onc_dayrecord')
+                        ->where('or_id', $order->or_id)
+                        ->where('or_orderno', $oldOrderNo)
+                        ->where('or_medcode', $item['or_medcode'])
+                        ->update(['or_orderno' => $item['or_orderno']]);
+                }
+            }
+        });
+
+        return redirect()
+            ->route('pharmacist.show', $order->or_id)
+            ->with('success', 'บันทึกลำดับการให้ยาเคมีบำบัดเรียบร้อยแล้ว');
     }
 
     /**
      * เภสัชกรกด Confirm รับคำสั่งใช้ยา และแตก order_d ออกเป็นรายวันลงในตาราง onc_dayrecord
      */
-    public function confirm(string $orId)
+    public function confirm(Request $request, string $orId)
     {
         $order = OrderHeader::with(['details.medication'])->findOrFail($orId);
 
-        DB::transaction(function () use ($order) {
+        DB::transaction(function () use ($request, $order) {
+            // หากเภสัชกรกรอกลำดับการให้ยาเข้ามาพร้อมการกด Confirm ให้อัปเดตลำดับใน order_d ก่อนแตกรายวัน
+            if ($request->filled('sequences') && is_array($request->input('sequences'))) {
+                $sequences = $request->input('sequences');
+                $existingDetails = $order->details->values();
+                DB::table('order_d')->where('or_id', $order->or_id)->delete();
+
+                foreach ($existingDetails as $idx => $detail) {
+                    $newSeq = (int) ($sequences[$idx] ?? $detail->or_orderno ?? ($idx + 1));
+                    $data = $detail->toArray();
+                    $data['or_orderno'] = $newSeq;
+                    unset($data['medication'], $data['unit'], $data['solution'], $data['route'], $data['timing']);
+                    OrderDetail::create($data);
+                }
+
+                $order->load(['details.medication']);
+            }
             // 1. Update order_h status -> รับคำสั่งแล้ว
             $order->update([
                 'or_confirm'         => 1,
@@ -395,7 +472,7 @@ class PharmacistController extends Controller
                 'doses_count'    => $items->count(),
                 'stickers_count' => $items->count() + 1, // ยารายขวด + 1 ดวงสรุปรายการยาประจำวัน
                 'orderHeader'    => $header,
-                'items'          => $items->values(),
+                'items'          => $items->sortBy('or_orderno')->values(),
             ];
         });
 
