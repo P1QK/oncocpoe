@@ -40,14 +40,17 @@
                         </p>
                         <div class="d-flex justify-content-around bg-light rounded-3 p-2 small">
                             <div>
-                                <div class="fw-bold text-primary fs-5">{{ $stats['orders_total'] }}</div>
-                                <span class="text-secondary">คำสั่งทั้งหมด</span>
+                                <div class="fw-bold text-primary fs-5">{{ $stats['today_orders_total'] }}</div>
+                                <span class="text-secondary">คำสั่งยาวันนี้</span>
                             </div>
                             <div class="border-start"></div>
                             <div>
-                                <div class="fw-bold text-success fs-5">{{ $stats['regimens_count'] }}</div>
-                                <span class="text-secondary">สูตร Regimen</span>
+                                <div class="fw-bold text-success fs-5">{{ $stats['today_orders_confirmed'] }}</div>
+                                <span class="text-secondary">รับคำสั่งแล้ววันนี้</span>
                             </div>
+                        </div>
+                        <div class="mt-2 pt-1 text-muted opacity-75" style="font-size: 0.74rem;">
+                            สะสมทั้งหมด: {{ $stats['orders_total'] }} คำสั่งยา &bull; สูตร Regimen {{ $stats['regimens_count'] }} สูตร
                         </div>
                     </div>
                 </div>
@@ -69,14 +72,17 @@
                         </p>
                         <div class="d-flex justify-content-around bg-light rounded-3 p-2 small">
                             <div>
-                                <div class="fw-bold text-danger fs-5">{{ $stats['orders_pending'] }}</div>
-                                <span class="text-secondary">รอรับคำสั่ง</span>
+                                <div class="fw-bold text-danger fs-5">{{ $stats['today_orders_pending'] }}</div>
+                                <span class="text-secondary">รอรับคำสั่งวันนี้</span>
                             </div>
                             <div class="border-start"></div>
                             <div>
-                                <div class="fw-bold text-success fs-5">{{ $stats['orders_confirmed'] }}</div>
-                                <span class="text-secondary">รับคำสั่งแล้ว</span>
+                                <div class="fw-bold text-success fs-5">{{ $stats['today_orders_confirmed'] }}</div>
+                                <span class="text-secondary">รับคำสั่งแล้ววันนี้</span>
                             </div>
+                        </div>
+                        <div class="mt-2 pt-1 text-muted opacity-75" style="font-size: 0.74rem;">
+                            สะสมทั้งหมด: รอรับคำสั่ง {{ $stats['orders_pending'] }} &bull; รับแล้ว {{ $stats['orders_confirmed'] }} (รวม {{ $stats['orders_total'] }})
                         </div>
                     </div>
                 </div>
@@ -103,9 +109,12 @@
                             </div>
                             <div class="border-start"></div>
                             <div>
-                                <div class="fw-bold text-dark fs-5">{{ $stats['orders_confirmed'] }}</div>
-                                <span class="text-secondary">คำสั่งที่ยืนยันแล้ว</span>
+                                <div class="fw-bold text-primary fs-5">{{ $stats['today_delivered'] }}</div>
+                                <span class="text-secondary">บริหารยาแล้ววันนี้</span>
                             </div>
+                        </div>
+                        <div class="mt-2 pt-1 text-muted opacity-75" style="font-size: 0.74rem;">
+                            สะสมทั้งหมด: รายการให้ยา {{ $stats['all_doses'] }} โดส &bull; บริหารยาแล้ว {{ $stats['all_delivered'] }} โดส
                         </div>
                     </div>
                 </div>

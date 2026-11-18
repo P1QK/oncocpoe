@@ -31,14 +31,24 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 Route::middleware('auth')->group(function () {
     // Central Hub / Home (shows only sections permitted for the current user's role)
     Route::get('/home', function () {
+        $today = today();
         $stats = [
-            'orders_total'     => OrderHeader::count(),
-            'orders_pending'   => OrderHeader::where('or_confirm', 0)->count(),
-            'orders_confirmed' => OrderHeader::where('or_confirm', 1)->count(),
-            'regimens_count'   => RegimenHeader::where('rh_used', 1)->count(),
-            'meds_count'       => Medcyto::count(),
-            'today_doses'      => OncDayRecord::whereDate('or_daterec', today())->count(),
-            'users_count'      => User::count(),
+            // ข้อมูลเฉพาะวันปัจจุบัน (Today)
+            'today_orders_total'     => OrderHeader::whereDate('or_date', $today)->count(),
+            'today_orders_pending'   => OrderHeader::whereDate('or_date', $today)->where('or_confirm', 0)->count(),
+            'today_orders_confirmed' => OrderHeader::whereDate('or_date', $today)->where('or_confirm', 1)->count(),
+            'today_doses'            => OncDayRecord::whereDate('or_daterec', $today)->count(),
+            'today_delivered'        => OncDayRecord::whereDate('or_daterec', $today)->where('or_send', 1)->count(),
+
+            // ข้อมูลสะสมทั้งหมด (All-time)
+            'orders_total'           => OrderHeader::count(),
+            'orders_pending'         => OrderHeader::where('or_confirm', 0)->count(),
+            'orders_confirmed'       => OrderHeader::where('or_confirm', 1)->count(),
+            'all_doses'              => OncDayRecord::count(),
+            'all_delivered'          => OncDayRecord::where('or_send', 1)->count(),
+            'regimens_count'         => RegimenHeader::where('rh_used', 1)->count(),
+            'meds_count'             => Medcyto::count(),
+            'users_count'            => User::count(),
         ];
         return view('home', compact('stats'));
     })->name('home');
