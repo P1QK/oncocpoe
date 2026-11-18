@@ -13,7 +13,11 @@ class PharmacistController extends Controller
 {
     public function index(Request $request)
     {
+        // แสดงเฉพาะคำสั่งใช้ยาตามวันที่ที่เลือก (ค่าเริ่มต้น = วันที่ปัจจุบัน)
+        $selectedDate = $request->input('date') ?: today()->format('Y-m-d');
+
         $query = OrderHeader::with(['details.medication', 'details.solution', 'ward'])
+            ->whereDate('or_date', $selectedDate)
             ->orderBy('or_confirm', 'asc') // แสดงคำสั่งที่ยังไม่รับคำสั่งขึ้นก่อน
             ->orderByDesc('or_date')
             ->orderByDesc('or_id');
@@ -38,10 +42,10 @@ class PharmacistController extends Controller
 
         $orders = $query->paginate(15)->withQueryString();
 
-        $stats = $this->getStats();
-        $latestToken = $this->getStateToken();
+        $stats = $this->getStats($selectedDate);
+        $latestToken = $this->getStateToken($selectedDate);
 
-        return view('pharmacist.index', compact('orders', 'stats', 'latestToken'));
+        return view('pharmacist.index', compact('orders', 'stats', 'latestToken', 'selectedDate'));
     }
 
     /**
@@ -49,29 +53,34 @@ class PharmacistController extends Controller
      */
     public function poll(Request $request)
     {
+        $selectedDate = $request->input('date') ?: today()->format('Y-m-d');
+
         return response()->json([
-            'token'   => $this->getStateToken(),
-            'stats'   => $this->getStats(),
+            'token'   => $this->getStateToken($selectedDate),
+            'stats'   => $this->getStats($selectedDate),
             'time'    => now()->format('H:i:s'),
         ]);
     }
 
-    private function getStats(): array
+    private function getStats(?string $selectedDate = null): array
     {
+        $date = $selectedDate ?: today()->format('Y-m-d');
+
         return [
-            'total'       => OrderHeader::count(),
-            'pending'     => OrderHeader::where('or_confirm', 0)->count(),
-            'confirmed'   => OrderHeader::where('or_confirm', 1)->count(),
-            'today_doses' => OncDayRecord::whereDate('or_daterec', today())->count(),
+            'total'       => OrderHeader::whereDate('or_date', $date)->count(),
+            'pending'     => OrderHeader::whereDate('or_date', $date)->where('or_confirm', 0)->count(),
+            'confirmed'   => OrderHeader::whereDate('or_date', $date)->where('or_confirm', 1)->count(),
+            'today_doses' => OncDayRecord::whereDate('or_daterec', $date)->count(),
         ];
     }
 
-    private function getStateToken(): string
+    private function getStateToken(?string $selectedDate = null): string
     {
-        $count = OrderHeader::count();
-        $pending = OrderHeader::where('or_confirm', 0)->count();
-        $latestId = OrderHeader::orderByDesc('or_id')->value('or_id') ?? 'none';
-        return md5("{$count}|{$pending}|{$latestId}");
+        $date = $selectedDate ?: today()->format('Y-m-d');
+        $count = OrderHeader::whereDate('or_date', $date)->count();
+        $pending = OrderHeader::whereDate('or_date', $date)->where('or_confirm', 0)->count();
+        $latestId = OrderHeader::whereDate('or_date', $date)->orderByDesc('or_id')->value('or_id') ?? 'none';
+        return md5("{$date}|{$count}|{$pending}|{$latestId}");
     }
 
     public function show(string $orId)

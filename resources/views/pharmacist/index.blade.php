@@ -9,18 +9,26 @@
             <i class="bi bi-capsule-pill me-2"></i>ระบบเภสัชกร: รับคำสั่งใช้ยาและเตรียมยาเคมีบำบัด (Pharmacist Station)
         </h4>
         <small class="text-secondary">
-            ระบบตรวจสอบคำสั่งใหม่แบบ Real-time อัตโนมัติ ยืนยันรับคำสั่ง แตกคำสั่งรายวัน และพิมพ์ใบจัดยา (A5 แนวนอน) / ฉลากยา
+            แสดงเฉพาะคำสั่งใช้ยาประจำวันที่เลือก (<strong class="text-dark">{{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}</strong>)
+            &mdash; ตรวจสอบคำสั่งใหม่แบบ Real-time อัตโนมัติ ยืนยันรับคำสั่ง แตกคำสั่งรายวัน และพิมพ์ใบจัดยา (A5 แนวนอน) / ฉลากยา
         </small>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{{ route('pharmacist.stickers') }}" class="btn btn-primary fw-semibold shadow-sm">
+        <span class="badge bg-success-subtle text-success border border-success fs-6 px-3 py-2">
+            <i class="bi bi-calendar-event me-1"></i>
+            วันที่แสดงผล: {{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}
+            @if($selectedDate === today()->format('Y-m-d'))
+                (วันนี้)
+            @endif
+        </span>
+        <a href="{{ route('pharmacist.stickers', ['date' => $selectedDate]) }}" class="btn btn-primary fw-semibold shadow-sm">
             <i class="bi bi-tags-fill me-1"></i> พิมพ์สติกเกอร์ตามวันที่ให้ยา (รวมทุกผู้ป่วย)
         </a>
         <span class="badge bg-success-subtle text-success border border-success px-3 py-2 d-flex align-items-center gap-2">
             <span class="spinner-grow spinner-grow-sm text-success" role="status"></span>
             <span>Auto-Refresh Real-time (<span id="lastCheckTime">{{ now()->format('H:i:s') }}</span>)</span>
         </span>
-        <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-success btn-sm">
+        <a href="{{ route('pharmacist.index', ['date' => $selectedDate]) }}" class="btn btn-outline-success btn-sm">
             <i class="bi bi-arrow-clockwise me-1"></i> รีเฟรชทันที
         </a>
     </div>
@@ -30,25 +38,25 @@
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-danger">
-            <div class="small text-secondary fw-semibold">รอรับคำสั่ง (New Orders)</div>
+            <div class="small text-secondary fw-semibold">รอรับคำสั่ง (วันที่เลือก)</div>
             <div class="fs-3 fw-bold text-danger" id="statPending">{{ $stats['pending'] }}</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-success">
-            <div class="small text-secondary fw-semibold">รับคำสั่งแล้ว (Confirmed)</div>
+            <div class="small text-secondary fw-semibold">รับคำสั่งแล้ว (วันที่เลือก)</div>
             <div class="fs-3 fw-bold text-success" id="statConfirmed">{{ $stats['confirmed'] }}</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-primary">
-            <div class="small text-secondary fw-semibold">คำสั่งทั้งหมด</div>
+            <div class="small text-secondary fw-semibold">คำสั่งทั้งหมด (วันที่เลือก)</div>
             <div class="fs-3 fw-bold text-primary" id="statTotal">{{ $stats['total'] }}</div>
         </div>
     </div>
     <div class="col-md-3 col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-info">
-            <div class="small text-secondary fw-semibold">รายการยารายวันวันนี้</div>
+            <div class="small text-secondary fw-semibold">รายการยารายวัน ({{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }})</div>
             <div class="fs-3 fw-bold text-info" id="statTodayDoses">{{ $stats['today_doses'] }}</div>
         </div>
     </div>
@@ -57,23 +65,29 @@
 <!-- ตัวกรองค้นหา -->
 <div class="card card-medical bg-white mb-4">
     <div class="card-body py-3">
-        <form method="GET" action="{{ route('pharmacist.index') }}" class="row g-2 align-items-center">
-            <div class="col-md-5">
+        <form method="GET" action="{{ route('pharmacist.index') }}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold text-secondary mb-1">วันที่สั่งใช้ยา (เลือกวันที่แสดง):</label>
+                <input type="date" name="date" class="form-control fw-bold border-success" value="{{ $selectedDate }}" onchange="this.form.submit()">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold text-secondary mb-1">ค้นหาผู้ป่วย / ใบสั่งยา:</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
                     <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="ค้นหา HN, ชื่อผู้ป่วย, เลขที่ใบสั่งยา, สูตร Regimen...">
                 </div>
             </div>
             <div class="col-md-3">
-                <select name="status" class="form-select">
+                <label class="form-label small fw-bold text-secondary mb-1">สถานะคำสั่ง:</label>
+                <select name="status" class="form-select" onchange="this.form.submit()">
                     <option value="">-- ทุกสถานะคำสั่ง --</option>
                     <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>รอรับคำสั่ง (Pending)</option>
                     <option value="confirmed" {{ request('status') === 'confirmed' ? 'selected' : '' }}>รับคำสั่งแล้ว (Confirmed)</option>
                 </select>
             </div>
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-success"><i class="bi bi-funnel-fill me-1"></i> กรองข้อมูล</button>
-                <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-secondary">ล้างค่า</a>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-success w-100"><i class="bi bi-funnel-fill me-1"></i> กรองข้อมูล</button>
+                <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-secondary" title="กลับสู่วันปัจจุบัน">วันนี้</a>
             </div>
         </form>
     </div>
@@ -176,8 +190,9 @@
                 @empty
                     <tr>
                         <td colspan="8" class="text-center py-5 text-secondary">
-                            <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-                            ยังไม่มีรายการคำสั่งใช้ยาเคมีบำบัดที่ส่งเข้ามา
+                            <i class="bi bi-calendar2-x fs-1 d-block mb-2 opacity-50"></i>
+                            ไม่มีรายการคำสั่งใช้ยาเคมีบำบัดในวันที่ <strong>{{ \Carbon\Carbon::parse($selectedDate)->format('d/m/Y') }}</strong>
+                            <div class="small text-muted mt-1">สามารถเลือกวันที่อื่นจากช่องวันที่ด้านบนเพื่อตรวจสอบคำสั่งใช้ยาย้อนหลังหรือล่วงหน้า</div>
                         </td>
                     </tr>
                 @endforelse
@@ -196,9 +211,9 @@
 <script>
     let currentStateToken = @json($latestToken);
 
-    // ตรวจสอบคำสั่งใหม่จากแพทย์ทุกๆ 5 วินาที หากมีคำสั่งใหม่หรือมีการเปลี่ยนแปลงสถานะ ให้รีเฟรชหน้าทันที
+    // ตรวจสอบคำสั่งใหม่จากแพทย์ทุกๆ 5 วินาที ตามวันที่ที่เลือก หากมีคำสั่งใหม่หรือมีการเปลี่ยนแปลงสถานะ ให้รีเฟรชหน้าทันที
     setInterval(function () {
-        fetch(@json(route('pharmacist.poll')), {
+        fetch(@json(route('pharmacist.poll', ['date' => $selectedDate])), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(res => res.json())
