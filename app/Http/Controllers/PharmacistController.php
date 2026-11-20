@@ -98,6 +98,7 @@ class PharmacistController extends Controller
             'dayRecords.solution',
             'dayRecords.route',
             'dayRecords.timing',
+            'supportiveMeds',
             'ward',
         ])->findOrFail($orId);
 
@@ -319,6 +320,7 @@ class PharmacistController extends Controller
             'dayRecords.solution',
             'dayRecords.route',
             'dayRecords.timing',
+            'supportiveMeds',
             'ward',
         ])->findOrFail($orId);
 

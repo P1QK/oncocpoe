@@ -208,16 +208,16 @@
                         <div class="row g-2 align-items-center mb-2 pb-2 border-bottom border-warning-subtle">
                             <div class="col-md-5">
                                 <label class="form-label fw-bold text-dark mb-1">
-                                    <i class="bi bi-sliders me-1 text-warning"></i>2. ปรับลดขนาดยา (% Reduction):
+                                    <i class="bi bi-sliders me-1 text-warning"></i>2. ปรับลดขนาดยาทั้งหมด (% ทั้งสูตร):
                                 </label>
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-warning-subtle fw-bold">ลดลง</span>
+                                    <span class="input-group-text bg-warning-subtle fw-bold">ลดทั้งหมด</span>
                                     <input type="number" step="1" min="0" max="90" name="or_adjust_percent" id="globalReducePct" class="form-control fw-bold text-danger fs-6 text-center" value="{{ old('or_adjust_percent', 0) }}" oninput="applyGlobalReduction(this.value)">
                                     <span class="input-group-text bg-warning-subtle fw-bold">%</span>
                                 </div>
                             </div>
                             <div class="col-md-7">
-                                <div class="small fw-semibold text-secondary mb-1">ปุ่มลัดปรับลดขนาดยา:</div>
+                                <div class="small fw-semibold text-secondary mb-1">ปุ่มลัดปรับลดทั้งสูตร (หรือปรับลดแยกเฉพาะตัวในตารางด้านล่าง):</div>
                                 <div class="d-flex flex-wrap gap-1">
                                     <button type="button" class="btn btn-sm btn-outline-secondary fw-bold py-0 px-2" onclick="setGlobalReduction(0)">0% (Full)</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger fw-bold py-0 px-2" onclick="setGlobalReduction(10)">-10%</button>
@@ -237,12 +237,12 @@
                                     <i class="bi bi-Bullseye me-1"></i>3. รูปแบบการปัดขนาดยา (Dose Banding / Rounding):
                                 </label>
                                 <select id="roundingModeSelect" class="form-select form-select-sm border-primary fw-semibold" onchange="recalculateAllRows()">
-                                    <option value="clinical_band" selected>Clinical Dose Banding (ปัดตามมาตรฐานตัวยา ภายใน &plusmn;5%)</option>
+                                    <option value="clinical_band">Clinical Dose Banding (ปัดตามมาตรฐานตัวยา ภายใน &plusmn;5%)</option>
                                     <option value="syringe_05">Syringe Volume 0.5 mL (ปัดให้ดูดยาลงตัวทุก 0.5 mL)</option>
                                     <option value="syringe_02">Syringe Volume 0.2 mL (ปัดให้ดูดยาลงตัวทุก 0.2 mL)</option>
                                     <option value="int_5">Round to 5 mg (ปัดเป็นจำนวนเต็มทีละ 5 mg)</option>
                                     <option value="int_1">Round to 1 mg (ปัดเป็นจำนวนเต็ม 1 mg)</option>
-                                    <option value="exact">Exact Dose (ไม่ปัดเศษ ใช้ค่าทศนิยมตามจริง)</option>
+                                    <option value="exact" selected>Exact Dose (ไม่ปัดเศษ ใช้ค่าทศนิยมตามจริง)</option>
                                 </select>
                             </div>
                             <div class="col-md-5">
@@ -305,7 +305,7 @@
                             <th style="min-width: 210px;">รหัสยา / ชื่อยาเคมีบำบัด</th>
                             <th style="min-width: 145px;">ขนาดยาเริ่มต้น<br>(ตามสูตร / กำหนดเอง)</th>
                             <th style="width: 130px;">ขนาดยาคำนวณ<br>(คูณ BSA/GFR)</th>
-                            <th style="width: 100px;">ปรับลด (%)</th>
+                            <th style="min-width: 165px;" class="bg-warning text-dark">ปรับลดเฉพาะตัว (%)<br><small class="fw-normal">ปรับรายตัวยาได้</small></th>
                             <th style="width: 195px;" class="bg-danger">ขนาดยาใหม่ที่ให้จริง<br>(Final Dose, mg)</th>
                             <th style="min-width: 145px;">สารน้ำ (Diluent)</th>
                             <th style="width: 105px;">ปริมาตรสารน้ำ<br>(mL)</th>
@@ -324,6 +324,207 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 3: PRE-MEDICATION (Antiemetics & Prophylaxis for Hypersensitivity / Infusion Reaction) -->
+    <div class="card card-medical bg-white mb-4 border-top border-4 border-info">
+        <div class="card-header bg-info-subtle text-dark py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="fw-bold">
+                <i class="bi bi-shield-plus text-info me-2"></i>ส่วนที่ 3: Pre-medication (ยาเตรียมก่อนให้เคมีบำบัด &mdash; ปรับอัตโนมัติตาม Regimen และเลือกเปิด/ปิดได้)
+            </span>
+            <span class="badge bg-info text-dark" id="preMedSelectedCounter">เลือกใช้: 0 รายการ</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- 3.1 Antiemetics -->
+                <div class="col-lg-6">
+                    <div class="border rounded-3 h-100 overflow-hidden">
+                        <div class="bg-primary-subtle px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-primary small">
+                                <i class="bi bi-capsule me-1"></i>1. Antiemetics (ยาป้องกันคลื่นไส้-อาเจียน)
+                            </span>
+                            <span class="badge bg-white text-primary border">{{ $preMedAntiemetics->count() }} รายการ</span>
+                        </div>
+                        <div class="p-2 d-flex flex-column gap-2">
+                            @foreach($preMedAntiemetics as $pm)
+                                @php $pmKey = $pm->sm_code; @endphp
+                                <div class="border rounded-2 p-2 pre-med-row bg-light" id="premed_row_{{ $pmKey }}" data-sm-code="{{ $pmKey }}" data-default-dose="{{ $pm->default_dose }}" data-default-route="{{ $pm->default_route }}" data-default-instruction="{{ $pm->default_instruction }}">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input pre-med-checkbox" type="checkbox" role="switch"
+                                                   id="premed_chk_{{ $pmKey }}"
+                                                   name="pre_meds[{{ $pmKey }}][enabled]" value="1"
+                                                   onchange="togglePreMedRow('{{ $pmKey }}')">
+                                            <label class="form-check-label fw-bold text-dark" for="premed_chk_{{ $pmKey }}">
+                                                {{ $pm->sm_name }}
+                                            </label>
+                                        </div>
+                                        <span class="badge bg-secondary-subtle text-secondary pre-med-status-badge" id="premed_badge_{{ $pmKey }}">ไม่ใช้</span>
+                                    </div>
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][sm_code]" value="{{ $pm->sm_code }}">
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][sm_name]" value="{{ $pm->sm_name }}">
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][category]" value="{{ $pm->category }}">
+
+                                    <div class="row g-1 align-items-center mt-1 pre-med-fields" id="premed_fields_{{ $pmKey }}">
+                                        <div class="col-5">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                                <input type="text" name="pre_meds[{{ $pmKey }}][dose]" id="premed_dose_{{ $pmKey }}"
+                                                       class="form-control fw-bold text-primary" value="{{ $pm->default_dose }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="text" name="pre_meds[{{ $pmKey }}][route]" id="premed_route_{{ $pmKey }}"
+                                                   class="form-control form-control-sm text-center" value="{{ $pm->default_route }}" placeholder="Route">
+                                        </div>
+                                        <div class="col-4">
+                                            @if(!empty($pm->dose_options) && is_array($pm->dose_options))
+                                                <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                                    @foreach($pm->dose_options as $opt)
+                                                        <button type="button" class="btn btn-outline-primary py-0 px-1" style="font-size: 0.67rem;"
+                                                                onclick="setPreMedDose('{{ $pmKey }}', '{{ $opt }}')">{{ $opt }}</button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="col-12 mt-1">
+                                            <input type="text" name="pre_meds[{{ $pmKey }}][instruction]" id="premed_inst_{{ $pmKey }}"
+                                                   class="form-control form-control-sm text-secondary" value="{{ $pm->default_instruction }}" placeholder="วิธีบริหารยา / เวลาให้ยา">
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3.2 Prophylaxis for Hypersensitivity / Infusion Reaction -->
+                <div class="col-lg-6">
+                    <div class="border rounded-3 h-100 overflow-hidden">
+                        <div class="bg-warning-subtle px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                            <span class="fw-bold text-dark small">
+                                <i class="bi bi-exclamation-shield-fill text-warning me-1"></i>2. Prophylaxis for Hypersensitivity / Infusion Reaction
+                            </span>
+                            <span class="badge bg-white text-dark border">{{ $preMedHypersensitivity->count() }} รายการ</span>
+                        </div>
+                        <div class="p-2 d-flex flex-column gap-2">
+                            @foreach($preMedHypersensitivity as $pm)
+                                @php $pmKey = $pm->sm_code; @endphp
+                                <div class="border rounded-2 p-2 pre-med-row bg-light" id="premed_row_{{ $pmKey }}" data-sm-code="{{ $pmKey }}" data-default-dose="{{ $pm->default_dose }}" data-default-route="{{ $pm->default_route }}" data-default-instruction="{{ $pm->default_instruction }}">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input pre-med-checkbox" type="checkbox" role="switch"
+                                                   id="premed_chk_{{ $pmKey }}"
+                                                   name="pre_meds[{{ $pmKey }}][enabled]" value="1"
+                                                   onchange="togglePreMedRow('{{ $pmKey }}')">
+                                            <label class="form-check-label fw-bold text-dark" for="premed_chk_{{ $pmKey }}">
+                                                {{ $pm->sm_name }}
+                                            </label>
+                                        </div>
+                                        <span class="badge bg-secondary-subtle text-secondary pre-med-status-badge" id="premed_badge_{{ $pmKey }}">ไม่ใช้</span>
+                                    </div>
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][sm_code]" value="{{ $pm->sm_code }}">
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][sm_name]" value="{{ $pm->sm_name }}">
+                                    <input type="hidden" name="pre_meds[{{ $pmKey }}][category]" value="{{ $pm->category }}">
+
+                                    <div class="row g-1 align-items-center mt-1 pre-med-fields" id="premed_fields_{{ $pmKey }}">
+                                        <div class="col-5">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                                <input type="text" name="pre_meds[{{ $pmKey }}][dose]" id="premed_dose_{{ $pmKey }}"
+                                                       class="form-control fw-bold text-dark" value="{{ $pm->default_dose }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-3">
+                                            <input type="text" name="pre_meds[{{ $pmKey }}][route]" id="premed_route_{{ $pmKey }}"
+                                                   class="form-control form-control-sm text-center" value="{{ $pm->default_route }}" placeholder="Route">
+                                        </div>
+                                        <div class="col-4">
+                                            @if(!empty($pm->dose_options) && is_array($pm->dose_options))
+                                                <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                                    @foreach($pm->dose_options as $opt)
+                                                        <button type="button" class="btn btn-outline-secondary py-0 px-1" style="font-size: 0.67rem;"
+                                                                onclick="setPreMedDose('{{ $pmKey }}', '{{ $opt }}')">{{ $opt }}</button>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="col-12 mt-1">
+                                            <input type="text" name="pre_meds[{{ $pmKey }}][instruction]" id="premed_inst_{{ $pmKey }}"
+                                                   class="form-control form-control-sm text-secondary" value="{{ $pm->default_instruction }}" placeholder="วิธีบริหารยา / เวลาให้ยา">
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 4: PRE-HYDRATION (การให้สารน้ำและอิเล็กโทรไลต์ก่อนเคมีบำบัด) -->
+    <div class="card card-medical bg-white mb-4 border-top border-4 border-primary">
+        <div class="card-header bg-primary-subtle text-dark py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="fw-bold">
+                <i class="bi bi-droplet-fill text-primary me-2"></i>ส่วนที่ 4: Pre-hydration (สารน้ำและอิเล็กโทรไลต์ก่อนให้เคมีบำบัด &mdash; ปรับอัตโนมัติตาม Regimen เช่น Cisplatin)
+            </span>
+            <span class="badge bg-primary text-white" id="preHydSelectedCounter">เลือกใช้: 0 รายการ</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                @foreach($preHydrations as $ph)
+                    @php $phKey = $ph->sm_code; @endphp
+                    <div class="col-lg-6">
+                        <div class="border rounded-2 p-2 pre-med-row bg-light h-100" id="premed_row_{{ $phKey }}" data-sm-code="{{ $phKey }}" data-category="pre_hydration" data-default-dose="{{ $ph->default_dose }}" data-default-route="{{ $ph->default_route }}" data-default-instruction="{{ $ph->default_instruction }}">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input pre-med-checkbox pre-hyd-checkbox" type="checkbox" role="switch"
+                                           id="premed_chk_{{ $phKey }}"
+                                           name="pre_meds[{{ $phKey }}][enabled]" value="1"
+                                           onchange="togglePreMedRow('{{ $phKey }}')">
+                                    <label class="form-check-label fw-bold text-dark" for="premed_chk_{{ $phKey }}">
+                                        {{ $ph->sm_name }}
+                                    </label>
+                                </div>
+                                <span class="badge bg-secondary-subtle text-secondary pre-med-status-badge" id="premed_badge_{{ $phKey }}">ไม่ใช้</span>
+                            </div>
+                            <input type="hidden" name="pre_meds[{{ $phKey }}][sm_code]" value="{{ $ph->sm_code }}">
+                            <input type="hidden" name="pre_meds[{{ $phKey }}][sm_name]" value="{{ $ph->sm_name }}">
+                            <input type="hidden" name="pre_meds[{{ $phKey }}][category]" value="{{ $ph->category }}">
+
+                            <div class="row g-1 align-items-center mt-1 pre-med-fields" id="premed_fields_{{ $phKey }}">
+                                <div class="col-5">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                        <input type="text" name="pre_meds[{{ $phKey }}][dose]" id="premed_dose_{{ $phKey }}"
+                                               class="form-control fw-bold text-primary" value="{{ $ph->default_dose }}">
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="pre_meds[{{ $phKey }}][route]" id="premed_route_{{ $phKey }}"
+                                           class="form-control form-control-sm text-center" value="{{ $ph->default_route }}" placeholder="Route">
+                                </div>
+                                <div class="col-4">
+                                    @if(!empty($ph->dose_options) && is_array($ph->dose_options))
+                                        <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                            @foreach($ph->dose_options as $opt)
+                                                <button type="button" class="btn btn-outline-primary py-0 px-1" style="font-size: 0.67rem;"
+                                                        onclick="setPreMedDose('{{ $phKey }}', '{{ $opt }}')">{{ $opt }}</button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <input type="text" name="pre_meds[{{ $phKey }}][instruction]" id="premed_inst_{{ $phKey }}"
+                                           class="form-control form-control-sm text-secondary" value="{{ $ph->default_instruction }}" placeholder="อัตราเร็ว / ระยะเวลาหยด">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
             </div>
         </div>
         <div class="card-footer bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -413,12 +614,14 @@
         if (rhId === 'CUSTOM') {
             document.getElementById('or_reg_code').value = 'CUSTOM';
             currentItems = [];
+            applyRegimenPreMeds({});
             addCustomMedicationRow();
             return;
         }
 
         if (!rhId || !REGIMENS_DATA[rhId]) {
             currentItems = [];
+            applyRegimenPreMeds({});
             renderMedTable();
             updateSubmitState();
             return;
@@ -428,6 +631,7 @@
 
         const globalReduce = parseFloat(document.getElementById('globalReducePct').value) || 0;
         const reg = REGIMENS_DATA[rhId];
+        applyRegimenPreMeds(reg.pre_meds || {});
 
         currentItems = reg.items.map((item, idx) => ({
             orderno: item.rd_orderno || (idx + 1),
@@ -640,15 +844,30 @@
                         <small class="text-secondary d-block" id="raw_reduced_text_${idx}"></small>
                         <input type="hidden" name="items[${idx}][std_dose]" id="std_dose_input_${idx}" value="0" ${disabledAttr}>
                     </td>
-                    <td>
-                        <div class="input-group input-group-sm">
+                    <td class="bg-warning-subtle" style="min-width: 165px;">
+                        <div class="input-group input-group-sm mb-1">
+                            <span class="input-group-text px-1 bg-white text-secondary" style="font-size: 0.72rem;">ลด</span>
                             <input type="number" step="1" min="0" max="90"
                                 name="items[${idx}][reduce_pct]"
                                 id="reduce_pct_${idx}"
-                                class="form-control text-center fw-bold text-danger"
+                                class="form-control text-center fw-bold text-danger px-1"
                                 value="${item.reduce_pct}"
                                 oninput="onItemReduceChange(${idx}, this.value)" ${disabledAttr}>
-                            <span class="input-group-text">%</span>
+                            <span class="input-group-text px-1 bg-white fw-bold">%</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 justify-content-center" id="item_reduce_btns_${idx}">
+                            ${[0, 10, 20, 25, 30, 50].map(p => {
+                                const isActive = Math.round(item.reduce_pct) === p;
+                                const cls = isActive
+                                    ? (p === 0 ? 'btn-secondary' : 'btn-danger')
+                                    : (p === 0 ? 'btn-outline-secondary' : 'btn-outline-danger');
+                                return `<button type="button" class="btn ${cls} py-0 px-1 fw-semibold" style="font-size: 0.67rem;" onclick="setItemReduction(${idx}, ${p})" ${disabledAttr}>${p === 0 ? '0%' : '-' + p + '%'}</button>`;
+                            }).join('')}
+                        </div>
+                        <div class="text-center mt-1" id="item_reduce_status_${idx}">
+                            ${item.reduce_pct > 0
+                                ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 0.67rem;">ลดเฉพาะตัว -${item.reduce_pct}%</span>`
+                                : `<span class="text-muted" style="font-size: 0.67rem;">100% (Full Dose)</span>`}
                         </div>
                     </td>
                     <td style="min-width: 195px;">
@@ -954,8 +1173,38 @@
             item.reduce_pct = cleanPct;
             const el = document.getElementById(`reduce_pct_${idx}`);
             if (el) el.value = cleanPct;
+            updateItemReduceUI(idx, cleanPct);
         });
         recalculateAllRows();
+    }
+
+    function setItemReduction(idx, pct) {
+        const el = document.getElementById(`reduce_pct_${idx}`);
+        if (el) el.value = pct;
+        onItemReduceChange(idx, pct);
+    }
+
+    function updateItemReduceUI(idx, pct) {
+        const btnsEl = document.getElementById(`item_reduce_btns_${idx}`);
+        const statusEl = document.getElementById(`item_reduce_status_${idx}`);
+        const isOff = currentItems[idx] ? !!currentItems[idx].is_off : false;
+        const disabledAttr = isOff ? 'disabled' : '';
+
+        if (btnsEl) {
+            btnsEl.innerHTML = [0, 10, 20, 25, 30, 50].map(p => {
+                const isActive = Math.round(pct) === p;
+                const cls = isActive
+                    ? (p === 0 ? 'btn-secondary' : 'btn-danger')
+                    : (p === 0 ? 'btn-outline-secondary' : 'btn-outline-danger');
+                return `<button type="button" class="btn ${cls} py-0 px-1 fw-semibold" style="font-size: 0.67rem;" onclick="setItemReduction(${idx}, ${p})" ${disabledAttr}>${p === 0 ? '0%' : '-' + p + '%'}</button>`;
+            }).join('');
+        }
+
+        if (statusEl) {
+            statusEl.innerHTML = pct > 0
+                ? `<span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size: 0.67rem;">ลดเฉพาะตัว -${pct}%</span>`
+                : `<span class="text-muted" style="font-size: 0.67rem;">100% (Full Dose)</span>`;
+        }
     }
 
     function onItemReduceChange(idx, val) {
@@ -979,6 +1228,7 @@
             }
 
             document.getElementById(`final_dose_${idx}`).value = finalDose.toFixed(2);
+            updateItemReduceUI(idx, cleanPct);
             updateBandingUI(idx, rawReducedDose, finalDose, step, currentItems[idx].dg_conc);
         }
         toggleReasonBoxVisibility();
@@ -1328,8 +1578,92 @@
         }
     }
 
+    function applyRegimenPreMeds(preMedsMap) {
+        document.querySelectorAll('.pre-med-row').forEach(row => {
+            const code = row.getAttribute('data-sm-code');
+            const chk = document.getElementById(`premed_chk_${code}`);
+            const doseEl = document.getElementById(`premed_dose_${code}`);
+            const routeEl = document.getElementById(`premed_route_${code}`);
+            const instEl = document.getElementById(`premed_inst_${code}`);
+
+            const defDose = row.getAttribute('data-default-dose') || '';
+            const defRoute = row.getAttribute('data-default-route') || '';
+            const defInst = row.getAttribute('data-default-instruction') || '';
+
+            const cfg = preMedsMap && preMedsMap[code] ? preMedsMap[code] : null;
+            if (cfg && cfg.is_default) {
+                if (chk) chk.checked = true;
+                if (doseEl) doseEl.value = cfg.override_dose || defDose;
+                if (routeEl) routeEl.value = cfg.override_route || defRoute;
+                if (instEl) instEl.value = cfg.override_instruction || defInst;
+            } else {
+                if (chk) chk.checked = false;
+                if (doseEl) doseEl.value = defDose;
+                if (routeEl) routeEl.value = defRoute;
+                if (instEl) instEl.value = defInst;
+            }
+            togglePreMedRow(code);
+        });
+    }
+
+    function togglePreMedRow(code) {
+        const row = document.getElementById(`premed_row_${code}`);
+        const chk = document.getElementById(`premed_chk_${code}`);
+        const badge = document.getElementById(`premed_badge_${code}`);
+        const fields = document.getElementById(`premed_fields_${code}`);
+        const isChecked = chk && chk.checked;
+
+        if (row) {
+            row.classList.toggle('bg-white', isChecked);
+            row.classList.toggle('border-info', isChecked);
+            row.classList.toggle('shadow-sm', isChecked);
+            row.classList.toggle('bg-light', !isChecked);
+            row.classList.toggle('opacity-75', !isChecked);
+        }
+        if (badge) {
+            badge.className = isChecked
+                ? 'badge bg-success pre-med-status-badge'
+                : 'badge bg-secondary-subtle text-secondary pre-med-status-badge';
+            badge.innerText = isChecked ? 'สั่งใช้ (ON)' : 'ไม่ใช้';
+        }
+        if (fields) {
+            fields.querySelectorAll('input').forEach(inp => {
+                inp.disabled = !isChecked;
+            });
+        }
+        updatePreMedCounter();
+    }
+
+    function setPreMedDose(code, doseVal) {
+        const chk = document.getElementById(`premed_chk_${code}`);
+        const doseEl = document.getElementById(`premed_dose_${code}`);
+        if (chk && !chk.checked) {
+            chk.checked = true;
+            togglePreMedRow(code);
+        }
+        if (doseEl) {
+            doseEl.value = doseVal;
+        }
+    }
+
+    function updatePreMedCounter() {
+        const preMedTotal = document.querySelectorAll('.pre-med-checkbox:not(.pre-hyd-checkbox):checked').length;
+        const preHydTotal = document.querySelectorAll('.pre-hyd-checkbox:checked').length;
+        const counterEl = document.getElementById('preMedSelectedCounter');
+        const hydCounterEl = document.getElementById('preHydSelectedCounter');
+        if (counterEl) {
+            counterEl.innerText = `เลือกใช้: ${preMedTotal} รายการ`;
+        }
+        if (hydCounterEl) {
+            hydCounterEl.innerText = `เลือกใช้: ${preHydTotal} รายการ`;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initRegimenSearch();
+        document.querySelectorAll('.pre-med-row').forEach(row => {
+            togglePreMedRow(row.getAttribute('data-sm-code'));
+        });
         document.querySelectorAll('.calc-trigger').forEach(el => {
             el.addEventListener('input', calculateBsaAndGfr);
             el.addEventListener('change', calculateBsaAndGfr);

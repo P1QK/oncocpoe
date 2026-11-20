@@ -106,6 +106,82 @@
     </div>
 </div>
 
+<!-- รายการ Pre-medication ที่แพทย์สั่ง (ตรวจสอบก่อนให้ยาเคมีบำบัด) -->
+@php
+    $preMeds = $order->supportiveMeds->whereIn('category', ['pre_med_antiemetic', 'pre_med_hypersensitivity']);
+    $antiemetics = $preMeds->where('category', 'pre_med_antiemetic');
+    $antiHsr = $preMeds->where('category', 'pre_med_hypersensitivity');
+@endphp
+@if($preMeds->isNotEmpty())
+    <div class="card card-medical bg-white mb-4 border-start border-4 border-info">
+        <div class="card-header bg-info-subtle py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-dark"><i class="bi bi-shield-plus text-info me-1"></i> รายการ Pre-medication (ยาเตรียมก่อนให้เคมีบำบัด)</span>
+            <span class="badge bg-info text-dark">{{ $preMeds->count() }} รายการ</span>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-3">
+                @if($antiemetics->isNotEmpty())
+                    <div class="col-md-6">
+                        <div class="small fw-bold text-primary mb-2"><i class="bi bi-capsule me-1"></i>Antiemetics (ป้องกันคลื่นไส้-อาเจียน)</div>
+                        <ul class="list-group list-group-flush small border rounded-2">
+                            @foreach($antiemetics as $pm)
+                                <li class="list-group-item py-2">
+                                    <span class="fw-bold text-dark">{{ $pm->sm_name }}</span>
+                                    <span class="badge bg-primary-subtle text-primary ms-1">{{ $pm->dose }}</span>
+                                    @if($pm->route)<span class="badge bg-light text-dark border ms-1">{{ $pm->route }}</span>@endif
+                                    @if($pm->instruction)<div class="text-secondary mt-1">{{ $pm->instruction }}</div>@endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+                @if($antiHsr->isNotEmpty())
+                    <div class="col-md-6">
+                        <div class="small fw-bold text-warning-emphasis mb-2"><i class="bi bi-exclamation-shield-fill text-warning me-1"></i>Prophylaxis for Hypersensitivity / Infusion Reaction</div>
+                        <ul class="list-group list-group-flush small border rounded-2">
+                            @foreach($antiHsr as $pm)
+                                <li class="list-group-item py-2">
+                                    <span class="fw-bold text-dark">{{ $pm->sm_name }}</span>
+                                    <span class="badge bg-warning-subtle text-dark border border-warning ms-1">{{ $pm->dose }}</span>
+                                    @if($pm->route)<span class="badge bg-light text-dark border ms-1">{{ $pm->route }}</span>@endif
+                                    @if($pm->instruction)<div class="text-secondary mt-1">{{ $pm->instruction }}</div>@endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+@endif
+
+<!-- รายการ Pre-hydration ที่แพทย์สั่ง (สารน้ำและอิเล็กโทรไลต์ก่อนเคมีบำบัด) -->
+@php
+    $preHydrations = $order->supportiveMeds->where('category', 'pre_hydration');
+@endphp
+@if($preHydrations->isNotEmpty())
+    <div class="card card-medical bg-white mb-4 border-start border-4 border-primary">
+        <div class="card-header bg-primary-subtle py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-dark"><i class="bi bi-droplet-fill text-primary me-1"></i> รายการ Pre-hydration (สารน้ำและอิเล็กโทรไลต์ก่อนเคมีบำบัด)</span>
+            <span class="badge bg-primary text-white">{{ $preHydrations->count() }} รายการ</span>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-2">
+                @foreach($preHydrations as $ph)
+                    <div class="col-md-6">
+                        <div class="border rounded-2 p-2 bg-light small h-100">
+                            <span class="fw-bold text-primary">{{ $ph->sm_name }}</span>
+                            <span class="badge bg-primary-subtle text-primary ms-1">{{ $ph->dose }}</span>
+                            @if($ph->route)<span class="badge bg-white text-dark border ms-1">{{ $ph->route }}</span>@endif
+                            @if($ph->instruction)<div class="text-secondary mt-1">{{ $ph->instruction }}</div>@endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
 <!-- ตารางที่ 1: รายการคำสั่งใช้ยาหลัก (order_d) -->
 <div class="card card-medical bg-white mb-4">
     <form method="POST" action="{{ route('pharmacist.sequence', $order->or_id) }}">

@@ -135,7 +135,7 @@
                     <th style="width: 28px;">#</th>
                     <th>รายการยาเคมีบำบัด (ความเข้มข้น)</th>
                     <th style="width: 85px;">ขนาดยาที่ได้รับ<br>(Dose)</th>
-                    <th style="width: 78px;">ปริมาตรดูดยา<br>(Working mL)</th>
+                    <th style="width: 78px;">ปริมาตรเตรียม<br>(Working mL)</th>
                     <th style="width: 120px;">สารน้ำเจือจาง &amp; ปริมาตร</th>
                     <th style="width: 72px;">ปริมาตรรวม<br>(Total mL)</th>
                     <th style="width: 110px;">วิถีทาง / เวลาให้ยา</th>

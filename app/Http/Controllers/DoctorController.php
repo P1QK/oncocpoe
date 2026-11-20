@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Medcyto;
 use App\Models\OrderDetail;
 use App\Models\OrderHeader;
+use App\Models\OrderSupportiveMed;
 use App\Models\RegimenHeader;
 use App\Models\Route;
 use App\Models\Solution;
+use App\Models\SupportiveMed;
 use App\Models\Timing;
 use App\Models\Unit;
 use App\Models\Ward;
@@ -62,7 +64,7 @@ class DoctorController extends Controller
     public function create()
     {
         $regimens = RegimenHeader::where('rh_used', 1)
-            ->with(['details.medication', 'details.unit', 'details.solution', 'details.route', 'details.timing'])
+            ->with(['details.medication', 'details.unit', 'details.solution', 'details.route', 'details.timing', 'supportiveMeds'])
             ->orderBy('rh_code')
             ->get();
 
@@ -73,12 +75,37 @@ class DoctorController extends Controller
         $timings   = Timing::orderBy('tm_code')->get();
         $units     = Unit::orderBy('un_code')->get();
 
+        $preMedAntiemetics = SupportiveMed::where('category', 'pre_med_antiemetic')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        $preMedHypersensitivity = SupportiveMed::where('category', 'pre_med_hypersensitivity')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        $preHydrations = SupportiveMed::where('category', 'pre_hydration')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
         // Prepare JSON structure for front-end dynamic calculation
         $regimensJson = $regimens->map(function ($reg) {
             return [
-                'rh_id'   => $reg->rh_id,
-                'rh_code' => $reg->rh_code,
-                'items'   => $reg->details->values()->map(function ($d, $idx) {
+                'rh_id'    => $reg->rh_id,
+                'rh_code'  => $reg->rh_code,
+                'pre_meds' => $reg->supportiveMeds->mapWithKeys(function ($sm) {
+                    return [
+                        $sm->sm_code => [
+                            'override_dose'        => $sm->override_dose,
+                            'override_route'       => $sm->override_route,
+                            'override_instruction' => $sm->override_instruction,
+                            'is_default'           => (bool) $sm->is_default,
+                        ],
+                    ];
+                }),
+                'items'    => $reg->details->values()->map(function ($d, $idx) {
                     return [
                         'rd_orderno'    => (int) ($d->rd_orderno ?: ($idx + 1)),
                         'rd_medcode'    => $d->rd_medcode,
@@ -110,7 +137,10 @@ class DoctorController extends Controller
             'solutions',
             'routes',
             'timings',
-            'units'
+            'units',
+            'preMedAntiemetics',
+            'preMedHypersensitivity',
+            'preHydrations'
         ));
     }
 
@@ -246,6 +276,14 @@ class DoctorController extends Controller
             'items.*.medtime'   => ['required', 'string', 'max:3'],
             'items.*.start_day' => ['required', 'integer', 'min:1'],
             'items.*.duration'  => ['required', 'integer', 'min:1', 'max:30'],
+            'pre_meds'               => ['nullable', 'array'],
+            'pre_meds.*.enabled'     => ['nullable'],
+            'pre_meds.*.sm_code'     => ['nullable', 'string', 'max:20'],
+            'pre_meds.*.sm_name'     => ['nullable', 'string', 'max:150'],
+            'pre_meds.*.category'    => ['nullable', 'string', 'max:40'],
+            'pre_meds.*.dose'        => ['nullable', 'string', 'max:50'],
+            'pre_meds.*.route'       => ['nullable', 'string', 'max:40'],
+            'pre_meds.*.instruction' => ['nullable', 'string', 'max:255'],
         ], [
             'or_hn.required'      => 'กรุณาระบุ HN ผู้ป่วย',
             'or_patname.required' => 'กรุณาระบุชื่อ-สกุลผู้ป่วย',
@@ -359,6 +397,24 @@ class DoctorController extends Controller
                     'or_cf'         => 0,
                 ]);
             }
+
+            // บันทึกรายการ Pre-medication (Antiemetics & Anti-Hypersensitivity) ที่แพทย์เลือกสั่งใช้
+            $preMedSort = 1;
+            foreach (($validated['pre_meds'] ?? []) as $pm) {
+                if (empty($pm['enabled']) || empty(trim((string) ($pm['sm_name'] ?? '')))) {
+                    continue;
+                }
+                OrderSupportiveMed::create([
+                    'or_id'       => $orId,
+                    'sm_code'     => $pm['sm_code'] ?? null,
+                    'sm_name'     => trim((string) $pm['sm_name']),
+                    'category'    => $pm['category'] ?? 'pre_med_antiemetic',
+                    'dose'        => trim((string) ($pm['dose'] ?? '-')),
+                    'route'       => trim((string) ($pm['route'] ?? '')),
+                    'instruction' => trim((string) ($pm['instruction'] ?? '')),
+                    'sort_order'  => $preMedSort++,
+                ]);
+            }
         });
 
         return redirect()
@@ -378,6 +434,7 @@ class DoctorController extends Controller
             'dayRecords.solution',
             'dayRecords.route',
             'dayRecords.timing',
+            'supportiveMeds',
             'ward',
         ])->findOrFail($orId);
 

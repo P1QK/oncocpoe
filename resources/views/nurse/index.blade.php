@@ -155,6 +155,52 @@
             </div>
         </div>
 
+        <!-- แถบแสดงรายการ Pre-medication ที่ต้องให้ก่อนเริ่มยาเคมีบำบัด -->
+        @if(isset($patient->pre_meds) && $patient->pre_meds->isNotEmpty())
+            <div class="px-4 py-2 bg-info-subtle border-bottom">
+                <div class="d-flex align-items-start flex-wrap gap-2 small">
+                    <span class="fw-bold text-dark text-nowrap mt-1">
+                        <i class="bi bi-shield-plus text-primary me-1"></i>Pre-medication (ให้ก่อนเริ่มยาเคมีบำบัด):
+                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($patient->pre_meds as $pm)
+                            <span class="badge bg-white text-dark border {{ $pm->category === 'pre_med_hypersensitivity' ? 'border-warning' : 'border-primary' }} px-2 py-1 text-start" title="{{ $pm->instruction }}">
+                                <strong class="{{ $pm->category === 'pre_med_hypersensitivity' ? 'text-warning-emphasis' : 'text-primary' }}">{{ $pm->sm_name }}</strong>
+                                {{ $pm->dose }}
+                                @if($pm->route)({{ $pm->route }})@endif
+                                @if($pm->instruction)
+                                    <span class="text-secondary fw-normal">&mdash; {{ $pm->instruction }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- แถบแสดงรายการ Pre-hydration (สารน้ำก่อนเริ่มยาเคมีบำบัด) -->
+        @if(isset($patient->pre_hydrations) && $patient->pre_hydrations->isNotEmpty())
+            <div class="px-4 py-2 bg-primary-subtle border-bottom">
+                <div class="d-flex align-items-start flex-wrap gap-2 small">
+                    <span class="fw-bold text-primary text-nowrap mt-1">
+                        <i class="bi bi-droplet-fill me-1"></i>Pre-hydration (ให้สารน้ำก่อนเริ่มยาเคมีบำบัด):
+                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($patient->pre_hydrations as $ph)
+                            <span class="badge bg-white text-dark border border-primary px-2 py-1 text-start" title="{{ $ph->instruction }}">
+                                <strong class="text-primary">{{ $ph->sm_name }}</strong>
+                                {{ $ph->dose }}
+                                @if($ph->route)({{ $ph->route }})@endif
+                                @if($ph->instruction)
+                                    <span class="text-secondary fw-normal">&mdash; {{ $ph->instruction }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- รายการยาย่อยใต้ชื่อผู้ป่วย (เฉพาะยาที่ให้ตรงวันที่เลือก) -->
         <div class="card-body p-0">
             <div class="table-responsive">

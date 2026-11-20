@@ -21,4 +21,9 @@ class RegimenHeader extends Model
     {
         return $this->hasMany(RegimenDetail::class, 'rd_id', 'rh_id')->orderBy('rd_orderno');
     }
+
+    public function supportiveMeds(): HasMany
+    {
+        return $this->hasMany(RegimenSupportiveMed::class, 'rh_id', 'rh_id');
+    }
 }

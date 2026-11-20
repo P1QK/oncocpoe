@@ -59,6 +59,11 @@ class OrderHeader extends Model
         return $this->hasMany(OncDayRecord::class, 'or_id', 'or_id')->orderBy('or_daterec')->orderBy('or_orderno');
     }
 
+    public function supportiveMeds(): HasMany
+    {
+        return $this->hasMany(OrderSupportiveMed::class, 'or_id', 'or_id')->orderBy('category')->orderBy('sort_order');
+    }
+
     public function ward(): BelongsTo
     {
         return $this->belongsTo(Ward::class, 'or_ward', 'wd_code');

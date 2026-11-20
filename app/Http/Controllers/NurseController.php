@@ -18,6 +18,7 @@ class NurseController extends Controller
 
         $query = OncDayRecord::with([
             'orderHeader.ward',
+            'orderHeader.supportiveMeds',
             'medication',
             'unit',
             'solution',
@@ -71,6 +72,12 @@ class NurseController extends Controller
                 'prep_count'        => $items->where('or_prep', 1)->count(),
                 'send_count'        => $items->where('or_send', 1)->count(),
                 'all_sent'          => $items->every(fn ($item) => (int) $item->or_send === 1),
+                'pre_meds'          => optional($header)->supportiveMeds
+                    ? $header->supportiveMeds->whereIn('category', ['pre_med_antiemetic', 'pre_med_hypersensitivity'])->values()
+                    : collect(),
+                'pre_hydrations'    => optional($header)->supportiveMeds
+                    ? $header->supportiveMeds->where('category', 'pre_hydration')->values()
+                    : collect(),
                 'items'             => $items->sortBy('or_orderno')->values(),
             ];
         })->values();

@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COPS™ Oncology — Presentation Slides</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --navy: #0f172a;
+            --blue: #1e3a8a;
+            --sky: #0284c7;
+            --teal: #0d9488;
+            --red: #dc2626;
+            --amber: #d97706;
+            --slate: #475569;
+            --bg: #f1f5f9;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #0b1120;
+            color: #1e293b;
+            overflow: hidden;
+        }
+        .deck {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .slide {
+            width: min(94vw, 1200px);
+            height: min(88vh, 675px);
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+            padding: 40px 52px;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+        .slide.active { display: flex; }
+        .slide-cover {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 58%, #0284c7 100%);
+            color: #fff;
+        }
+        .slide-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+            margin-bottom: 20px;
+        }
+        .slide-tag {
+            background: #e0f2fe;
+            color: #0369a1;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+        h1 { font-size: 46px; font-weight: 800; line-height: 1.18; }
+        h2 { font-size: 28px; font-weight: 800; color: var(--navy); }
+        h3 { font-size: 19px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
+        p, li { font-size: 16.5px; line-height: 1.55; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 6px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; flex: 1; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; flex: 1; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        .card {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px 18px;
+        }
+        .card-blue { border-top: 4px solid var(--sky); }
+        .card-green { border-top: 4px solid var(--teal); }
+        .card-red { border-top: 4px solid var(--red); }
+        .card-amber { border-top: 4px solid var(--amber); }
+        .card-navy { border-top: 4px solid var(--navy); }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; }
+        th { background: #eff6ff; color: var(--navy); font-weight: 700; }
+        .badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            font-weight: 700;
+        }
+        .b-blue { background: #dbeafe; color: #1d4ed8; }
+        .b-green { background: #dcfce7; color: #15803d; }
+        .b-red { background: #fee2e2; color: #b91c1c; }
+        .b-amber { background: #fef3c7; color: #b45309; }
+        .slide-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #64748b;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 10px;
+            margin-top: 14px;
+        }
+        .slide-cover .slide-footer { color: rgba(255,255,255,0.75); border-top-color: rgba(255,255,255,0.2); }
+        .controls {
+            position: fixed;
+            bottom: 16px;
+            right: 24px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+        .controls button {
+            background: rgba(15, 23, 42, 0.85);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .controls button:hover { background: var(--sky); }
+        .flow-step {
+            background: #fff;
+            border: 2px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+        }
+        .flow-num {
+            width: 34px; height: 34px; line-height: 34px;
+            border-radius: 50%; background: var(--blue); color: #fff;
+            font-weight: 800; margin: 0 auto 8px;
+        }
+        @media print {
+            body { background: #fff; overflow: visible; }
+            .controls { display: none !important; }
+            .deck { display: block; width: auto; height: auto; }
+            .slide {
+                display: flex !important;
+                width: 297mm;
+                height: 210mm;
+                margin: 0;
+                border-radius: 0;
+                box-shadow: none;
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="deck">
+
+    <!-- SLIDE 1: COVER -->
+    <section class="slide slide-cover active">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="badge" style="background:rgba(255,255,255,0.18); color:#fff; font-size:14px; padding:6px 14px;">
+                <i class="bi bi-hospital me-1"></i> Sterile Products Pharmacy Service — SPR Hospital
+            </span>
+            <span style="font-size:14px; opacity:0.85;">Version 1.5 &bull; พฤศจิกายน 2026</span>
+        </div>
+        <div style="margin: auto 0;">
+            <div style="font-size:18px; letter-spacing:2px; text-transform:uppercase; color:#7dd3fc; font-weight:700; margin-bottom:10px;">
+                System Development &amp; Clinical Workflow Presentation
+            </div>
+            <h1>COPS™ Oncology</h1>
+            <p style="font-size:24px; color:#e0f2fe; margin-top:12px; font-weight:600;">
+                Chemotherapy Ordering &amp; Preparation System
+            </p>
+            <p style="font-size:18px; color:rgba(255,255,255,0.85); margin-top:16px; max-width:780px;">
+                ระบบบริหารจัดการคำสั่งใช้ยา การเตรียมยา และการบริหารยาเคมีบำบัดชนิดฉีดแบบครบวงจร เชื่อมโยงการทำงานระหว่าง แพทย์ เภสัชกร และพยาบาล อย่างปลอดภัยและตรวจสอบย้อนกลับได้
+            </p>
+        </div>
+        <div class="slide-footer">
+            <span>Laravel 12 &bull; PHP 8.3 &bull; MySQL (oncospr) &bull; Bootstrap 5</span>
+            <span>สไลด์ 1 / 12 (กดปุ่ม &larr; &rarr; เพื่อเลื่อนสไลด์)</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 2: PROBLEM & OBJECTIVES -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>1. ปัญหาหน้างานและวัตถุประสงค์ของระบบ</h2>
+            <span class="slide-tag">Clinical Safety</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-red">
+                <h3><i class="bi bi-exclamation-triangle-fill" style="color:var(--red);"></i> ความเสี่ยงของกระบวนการเดิม</h3>
+                <ul>
+                    <li>ยาเคมีบำบัดเป็น <strong>High-Alert Medications</strong> มีดัชนีการรักษาแคบ</li>
+                    <li>การคำนวณขนาดยา (BSA / GFR / Calvert) และลดขนาดยา (%) ด้วยมือเสี่ยงต่อความคลาดเคลื่อน</li>
+                    <li>การคัดลอกใบสั่งยาซ้ำซ้อนระหว่าง แพทย์ → เภสัชกร → พยาบาล</li>
+                    <li>การแตกวันให้ยาหลายวัน (Day 1–4) และลำดับการให้ยาสับสนได้ง่าย</li>
+                    <li>การลืมสั่งยาเตรียมก่อนให้เคมีบำบัด (Pre-med / Pre-hydration)</li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h3><i class="bi bi-check-circle-fill" style="color:var(--teal);"></i> เป้าหมายของระบบ COPS™</h3>
+                <ul>
+                    <li>คำนวณขนาดยาอัตโนมัติ (Mosteller BSA, Cockcroft-Gault GFR, Dose Banding ±5%)</li>
+                    <li>เชื่อมโยงข้อมูลไร้รอยต่อแบบ Real-time จากห้องตรวจ → ห้องผสมยา → หอผู้ป่วย</li>
+                    <li>แยกตารางให้ยารายวัน (<code>onc_dayrecord</code>) ชัดเจน <strong>แสดงเฉพาะตรงวัน</strong></li>
+                    <li>มาตรฐานสติกเกอร์ <strong>9 × 7 cm</strong> พร้อม <strong>ลำดับให้ยา (1/3)</strong> และ <strong>Barcode</strong></li>
+                    <li>รองรับการเชื่อมต่อ <strong>HOSxP</strong> ในอนาคตเมื่อได้รับอนุมัติ</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Documentation &amp; Slides</span>
+            <span>2 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 3: END-TO-END WORKFLOW -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>2. ภาพรวมกระบวนการทำงาน (End-to-End Workflow)</h2>
+            <span class="slide-tag">Workflow</span>
+        </div>
+        <div class="grid-4" style="margin: auto 0;">
+            <div class="flow-step" style="border-color:var(--sky);">
+                <div class="flow-num" style="background:var(--sky);">1</div>
+                <h3>แพทย์ (Doctor)</h3>
+                <p style="font-size:14px;">กรอก HN เช็ค Cycle อัตโนมัติ, คำนวณ BSA/GFR, เลือก Regimen/ลดขนาดรายตัว, เลือก Pre-med &amp; Pre-hydration</p>
+            </div>
+            <div class="flow-step" style="border-color:var(--teal);">
+                <div class="flow-num" style="background:var(--teal);">2</div>
+                <h3>เภสัชกร (Verify)</h3>
+                <p style="font-size:14px;">รับคำสั่งแบบ Real-time, ตรวจสอบ Pre-med/Hydration &amp; ลำดับให้ยา, กด Confirm แตกวันลง <code>onc_dayrecord</code></p>
+            </div>
+            <div class="flow-step" style="border-color:var(--amber);">
+                <div class="flow-num" style="background:var(--amber);">3</div>
+                <h3>เตรียมยา &amp; ฉลาก</h3>
+                <p style="font-size:14px;">พิมพ์ใบจัดยา A5 แนวนอน และสติกเกอร์ขนาด 9×7 cm แสดงลำดับ <code>1/3, 2/3, 3/3</code> พร้อม Barcode <code>or_id</code></p>
+            </div>
+            <div class="flow-step" style="border-color:var(--navy);">
+                <div class="flow-num" style="background:var(--navy);">4</div>
+                <h3>พยาบาล (Nurse)</h3>
+                <p style="font-size:14px;">ดูรายการยาเฉพาะตรงวัน แยกตามผู้ป่วย: <strong>Pre-med → Pre-hydration → Chemo</strong> และยืนยัน 5 Rights</p>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — End-to-End Clinical Workflow</span>
+            <span>3 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 4: ARCHITECTURE & RBAC -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>3. สถาปัตยกรรมระบบและสิทธิ์ผู้ใช้งาน (Architecture &amp; RBAC)</h2>
+            <span class="slide-tag">Architecture</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-navy">
+                <h3>โครงสร้างทางเทคนิค (Tech Stack)</h3>
+                <ul>
+                    <li><strong>Backend:</strong> Laravel 12 Framework (PHP 8.3.30 / MAMP)</li>
+                    <li><strong>Architecture:</strong> Laravel MVC (Controllers + Blade + Fetch AJAX)</li>
+                    <li><strong>Database:</strong> MySQL <code>oncospr</code> (<code>utf8mb4_unicode_ci</code>)</li>
+                    <li><strong>UI &amp; Print:</strong> Bootstrap 5.3 + Print CSS (A5 &amp; 9×7 cm) + JsBarcode</li>
+                    <li><strong>Security:</strong> CSRF Protection, Eloquent Parameter Binding, Role Middleware</li>
+                </ul>
+            </div>
+            <div class="card card-blue">
+                <h3>การแบ่งสิทธิ์ตามบทบาท (<code>onc_users</code>)</h3>
+                <table>
+                    <thead><tr><th>Role</th><th>สิทธิ์การเข้าถึง</th></tr></thead>
+                    <tbody>
+                        <tr><td><span class="badge b-red">Superadmin</span></td><td>ทุกโมดูล + จัดการบัญชีผู้ใช้ (<code>onc_users</code>)</td></tr>
+                        <tr><td><span class="badge" style="background:#e2e8f0;">Admin</span></td><td>แพทย์/เภสัช/พยาบาล + จัดการ <code>medcyto</code> &amp; Regimens</td></tr>
+                        <tr><td><span class="badge b-blue">Doctor</span></td><td>สั่งใช้ยาเคมีบำบัด &amp; ดูประวัติคำสั่ง</td></tr>
+                        <tr><td><span class="badge b-green">Pharmacist</span></td><td>รับคำสั่ง, เตรียมยา, พิมพ์ใบจัดยา/สติกเกอร์</td></tr>
+                        <tr><td><span class="badge b-amber">Nurse</span></td><td>บริหารยารายวันตรงวัน &amp; ยืนยัน 5 Rights</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — System Architecture</span>
+            <span>4 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 5: DATABASE SCHEMA -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>4. โครงสร้างฐานข้อมูลหลัก (Database Schema: <code>oncospr</code>)</h2>
+            <span class="slide-tag">Database (15 Tables)</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-blue">
+                <h3>กลุ่มตารางคำสั่งใช้ยา (Transactions)</h3>
+                <table>
+                    <thead><tr><th>ตาราง</th><th>หน้าที่หลัก</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>order_h</code></td><td>หัวใบสั่งยา (HN, BSA, GFR, Regimen, Cycle, % ลด, สถานะ Confirm)</td></tr>
+                        <tr><td><code>order_d</code></td><td>รายการยาเคมีบำบัด (<code>or_orderno</code>, <code>or_reduce_pct</code>, Final Dose, Working Vol)</td></tr>
+                        <tr><td><code>onc_dayrecord</code></td><td>ตารางแตกคำสั่งรายวัน (<code>or_daterec</code>, สถานะเตรียม/ส่งมอบยา)</td></tr>
+                        <tr><td><code>order_supportive_meds</code></td><td>รายการ Pre-med / Pre-hydration ที่แพทย์สั่งจริงต่อใบสั่งยา</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="card card-green">
+                <h3>กลุ่มตารางข้อมูลหลัก (Master Data)</h3>
+                <table>
+                    <thead><tr><th>ตาราง</th><th>หน้าที่หลัก</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>medcyto</code></td><td>บัญชียาเคมีบำบัด (ความเข้มข้น <code>dg_conc</code>, ราคา, High-Alert)</td></tr>
+                        <tr><td><code>reg_h</code> / <code>reg_d</code></td><td>สูตรยาเคมีบำบัดมาตรฐาน + ลำดับการให้ยา (<code>rd_orderno</code>)</td></tr>
+                        <tr><td><code>supportive_meds</code></td><td>บัญชียา Pre-med (11 ตัว) &amp; Pre-hydration (6 ตัว) + ปุ่มขนาดยาด่วน</td></tr>
+                        <tr><td><code>regimen_supportive_meds</code></td><td>ตารางผูกค่าเริ่มต้น Pre-med &amp; Pre-hydration กับแต่ละ Regimen</td></tr>
+                        <tr><td><code>onc_users</code> &amp; Lookups</td><td>ผู้ใช้ + <code>units</code>, <code>solutions</code>, <code>routes</code>, <code>timing</code>, <code>wardtbls</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Relational Database Design</span>
+            <span>5 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 6: DOCTOR MODULE (ORDERING & CALCULATION) -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>5. ระบบแพทย์ (Doctor Ordering) — การคำนวณและปรับลดขนาดยา</h2>
+            <span class="slide-tag">Doctor Module</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-blue">
+                <h3>ความสามารถหลักในการสั่งใช้ยา</h3>
+                <ul>
+                    <li><strong>กรองวันที่แสดงผล:</strong> หน้า <code>doctor/index</code> แสดงเฉพาะคำสั่งของวันที่เลือก (Default = วันนี้)</li>
+                    <li><strong>Auto-Check Cycle จาก HN:</strong> ค้นหาประวัติเก่าและเติม <code>Cycle ถัดไป</code> อัตโนมัติ (แพทย์แก้ไขได้)</li>
+                    <li><strong>คำนวณอัตโนมัติ:</strong> BSA (Mosteller), GFR (Cockcroft-Gault), Calvert Formula สำหรับ Carboplatin</li>
+                    <li><strong>Clinical Dose Banding:</strong> ปัดขนาดยาภายใน ±5% หรือตามปริมาตร Syringe (0.2 / 0.5 mL)</li>
+                </ul>
+            </div>
+            <div class="card card-amber">
+                <h3>การปรับลดขนาดยาและสั่งยาแบบยืดหยุ่น</h3>
+                <ul>
+                    <li><strong>ลดขนาดยาทั้งสูตร (Global Reduction):</strong> ปุ่มลัด <code>0% ถึง -50%</code> ปรับทุกตัวยาพร้อมกัน</li>
+                    <li><strong>ลดขนาดยาเฉพาะตัว (Per-Drug Reduction):</strong> ปรับลด <code>%</code> แยกทีละตัวยาได้อิสระ พร้อมบันทึกเหตุผลทางคลินิก</li>
+                    <li><strong>ON/OFF ยาในสูตร &amp; สั่งอิสระ (CUSTOM):</strong> ยกเว้นยาบางตัวหรือเพิ่มตัวยาเองได้</li>
+                    <li><strong>ลำดับการให้ยา:</strong> ดึงอัตโนมัติจากสูตรยา Regimen (<code>rd_orderno</code>)</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Doctor Ordering System</span>
+            <span>6 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 7: PRE-MEDICATION & PRE-HYDRATION -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>6. ระบบ Pre-medication &amp; Pre-hydration อัตโนมัติตาม Regimen</h2>
+            <span class="slide-tag">Supportive Care</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-blue">
+                <h3>ส่วนที่ 3: Pre-medication (11 รายการ)</h3>
+                <p><strong>Antiemetics (6):</strong> Ondansetron inj. *(ปรับเพิ่มขนาด 8/12/16/24 mg ได้)*, Dexamethasone inj., Olanzapine tab., Metoclopramide inj., Palonosetron inj., Aprepitant tab.</p>
+                <p style="margin-top:8px;"><strong>Anti-Hypersensitivity (5):</strong> Famotidine tab., CPM inj., Hydrocortisone inj., Atropine inj., Paracetamol 500 mg. tab</p>
+            </div>
+            <div class="card card-green">
+                <h3>ส่วนที่ 4: Pre-hydration (6 รายการ)</h3>
+                <p><strong>สารน้ำ &amp; อิเล็กโทรไลต์:</strong> 0.9% NaCl (NSS 500/1,000 mL), 5% D/NSS, KCl inj. (10/20/40 mEq), MgSO4 inj. (1/2 g), 20% Mannitol, Furosemide inj.</p>
+                <p style="margin-top:8px;"><strong>Auto-Mapping:</strong> เมื่อเลือกสูตรเช่น <code>Pacli+Carbo</code> หรือ <code>Cisplatin+5FU</code> ระบบเปิดค่าเริ่มต้นให้ทันที และแพทย์เปิด/ปิดหรือปรับขนาดได้ทุกตัว แสดงผลครบทั้ง แพทย์ / เภสัชกร / พยาบาล</p>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Supportive Medication Protocol</span>
+            <span>7 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 8: PHARMACIST MODULE -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>7. ระบบเภสัชกร (Pharmacist Station) — รับคำสั่งและเตรียมยา</h2>
+            <span class="slide-tag">Pharmacist Module</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-green">
+                <h3>การตรวจสอบและรับคำสั่งแบบ Real-time</h3>
+                <ul>
+                    <li><strong>กรองตามวันที่ (Default = วันนี้)</strong> พร้อม <strong>Auto-Refresh Polling ทุก 5 วินาที</strong></li>
+                    <li>ตรวจสอบรายการ <strong>Pre-medication</strong>, <strong>Pre-hydration</strong>, BSA/GFR และเหตุผลลดขนาดยา</li>
+                    <li><strong>กำหนดลำดับการให้ยา (`or_orderno`):</strong> กรณีแพทย์สั่งแบบไม่มี Regimen (`CUSTOM`) เภสัชกรกรอกลำดับได้ทันทีในหน้ารายละเอียด</li>
+                    <li><strong>กด Confirm รับคำสั่ง:</strong> ระบบแตกคำสั่งรายวันลง <code>onc_dayrecord</code> ตามช่วง <code>or_start - or_stop</code> อัตโนมัติ</li>
+                </ul>
+            </div>
+            <div class="card card-navy">
+                <h3>ระบบงานพิมพ์ทางเภสัชกรรม</h3>
+                <ul>
+                    <li><strong>ใบจัดยา Working Formula (A5 แนวนอน):</strong> แสดงปริมาตรดูดยา (<code>mL</code>) และปริมาตรรวม</li>
+                    <li><strong>สติกเกอร์มาตรฐาน 9 × 7 cm ทุกดวง:</strong>
+                        <ul>
+                            <li>สติกเกอร์สรุปรายการยาประจำวัน (+1 ดวง/คนไข้) พร้อม <strong>Barcode <code>or_id</code></strong> ด้านล่าง</li>
+                            <li>สติกเกอร์ยารายขวด แสดง <strong>ลำดับการให้ยา <code>1/3, 2/3, 3/3</code></strong></li>
+                        </ul>
+                    </li>
+                    <li>เลือกพิมพ์ <strong>ทั้งหมดทุกคน</strong>, <strong>เฉพาะรายคนไข้</strong>, หรือ <strong>ทีละดวง</strong> ได้ทันที</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Pharmacist Station</span>
+            <span>8 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 9: NURSE MODULE -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>8. ระบบพยาบาล (Nurse Station) — บริหารยาข้างเตียง</h2>
+            <span class="slide-tag">Nurse Module</span>
+        </div>
+        <div class="grid-2">
+            <div class="card card-blue">
+                <h3>การแสดงผลเพื่อความปลอดภัยสูงสุด</h3>
+                <ul>
+                    <li><strong>แสดงเฉพาะยาที่ให้ตรงวัน (Default = วันนี้):</strong> ไม่นำรายการยาของวันถัดไปมาแสดงปะปน ลดความสับสนหน้างาน</li>
+                    <li><strong>จัดกลุ่มตามผู้ป่วย:</strong> หัวการ์ดแสดง <strong>HN และ ชื่อ-นามสกุลผู้ป่วย</strong> หอผู้ป่วย, Regimen, BSA/GFR</li>
+                    <li><strong>ลำดับการบริหารยาชัดเจน:</strong> แสดงแถบ <strong>1. Pre-medication → 2. Pre-hydration → 3. ตารางยาเคมีบำบัดย่อย</strong> เรียงตามลำดับ <code>#1, #2, #3</code></li>
+                </ul>
+            </div>
+            <div class="card card-green">
+                <h3>การยืนยันการบริหารยา (5 Rights)</h3>
+                <ul>
+                    <li>แสดงข้อควรระวังพิเศษ (<strong>High-Alert / Vesicant / Filter</strong>) แยกชัดเจนในแต่ละตัวยา</li>
+                    <li>แสดงสถานะการเตรียมยาจากห้องผสมยาแบบ Real-time (กำลังเตรียม / เตรียมพร้อมใช้ / บริหารแล้ว)</li>
+                    <li>ยืนยันรับ/บริหารยาได้ทั้งแบบ <strong>รายขวด</strong> และปุ่ม <strong>ยืนยันครบทุกรายการวันนี้</strong> ของผู้ป่วยรายนั้น</li>
+                </ul>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Nurse Administration Station</span>
+            <span>9 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 10: MASTER DATA & HOME DASHBOARD -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>9. หน้าหลัก (Home) และระบบจัดการข้อมูลหลัก (Admin)</h2>
+            <span class="slide-tag">Admin &amp; Dashboard</span>
+        </div>
+        <div class="grid-3">
+            <div class="card card-blue">
+                <h3>หน้าหลัก (<code>home.blade</code>)</h3>
+                <p>แสดงเฉพาะสิทธิ์ของแต่ละวิชาชีพ ตัวเลขหลักแสดง <strong>ยอดเฉพาะวันปัจจุบัน</strong> และยอดสะสมทั้งหมดเป็นตัวอักษรขนาดเล็กด้านล่าง</p>
+            </div>
+            <div class="card card-red">
+                <h3>จัดการยา <code>medcyto</code></h3>
+                <p>CRUD ข้อมูลยาเคมีบำบัดครบถ้วน (เฉพาะ Admin/Superadmin) ตรวจสอบความเข้มข้น &gt; 0 และป้องกันการลบยาที่ถูกใช้งานในสูตรหรือใบสั่งยาแล้ว</p>
+            </div>
+            <div class="card card-amber">
+                <h3>จัดการสูตร Regimen</h3>
+                <p>สร้างและแก้ไขสูตรยาเคมีบำบัดพร้อมระบบ <strong>รันลำดับการให้ยาอัตโนมัติ (1..N)</strong> ปุ่มเลื่อนแถว <code>▲/▼</code> และแก้ไขลำดับได้ตลอดเวลา</p>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Administration &amp; Master Data</span>
+            <span>10 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 11: DEVELOPMENT TIMELINE -->
+    <section class="slide">
+        <div class="slide-header">
+            <h2>10. สรุปความคืบหน้าการพัฒนา (Development Log v1.0 – v1.5)</h2>
+            <span class="slide-tag">Changelog</span>
+        </div>
+        <table>
+            <thead>
+                <tr><th style="width:90px;">เวอร์ชัน</th><th style="width:120px;">วันที่</th><th>ความสามารถที่พัฒนาและส่งมอบแล้ว</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>v1.0</strong></td><td>16 พ.ย. 2026</td><td>วางโครงสร้าง Database <code>oncospr</code>, ระบบ Auth/RBAC 5 สิทธิ์, โมดูล แพทย์ / เภสัชกร / พยาบาล / Regimen</td></tr>
+                <tr><td><strong>v1.1</strong></td><td>17 พ.ย. 2026</td><td>หน้าพยาบาลแสดงเฉพาะยาตรงวัน + จัดกลุ่มตาม HN/ชื่อผู้ป่วย + รายการยาย่อย</td></tr>
+                <tr><td><strong>v1.2</strong></td><td>18 พ.ย. 2026</td><td>กรองวันที่ (Default = วันนี้) หน้าแพทย์ &amp; เภสัชกร + สร้างระบบ CRUD ข้อมูลยา <code>medcyto</code></td></tr>
+                <tr><td><strong>v1.3</strong></td><td>18 พ.ย. 2026</td><td>สติกเกอร์ 9×7 cm + ลำดับการให้ยาอัตโนมัติ (<code>1/3, 2/3, 3/3</code>) + Barcode <code>or_id</code> + Auto-Check Cycle จาก HN + หน้าหลักยอดรายวัน</td></tr>
+                <tr><td><strong>v1.4</strong></td><td>20 พ.ย. 2026</td><td>ปรับลดขนาดยาเฉพาะรายตัว + ระบบ <strong>Pre-medication</strong> (11 รายการ) ผูกตาม Regimen ครบ 3 ฝ่าย</td></tr>
+                <tr><td><strong>v1.5</strong></td><td>20 พ.ย. 2026</td><td>ระบบ <strong>Pre-hydration</strong> (6 รายการ) ผูกอัตโนมัติกับสูตร Cisplatin/AC ครบ 3 ฝ่าย + เอกสารและสไลด์ชุดเผยแพร่</td></tr>
+            </tbody>
+        </table>
+        <div class="slide-footer">
+            <span>COPS™ Oncology — Iterative Development History</span>
+            <span>11 / 12</span>
+        </div>
+    </section>
+
+    <!-- SLIDE 12: NEXT STEPS & HOSXP ROADMAP -->
+    <section class="slide slide-cover">
+        <div class="slide-header" style="border-bottom-color:rgba(255,255,255,0.2);">
+            <h2 style="color:#fff;">11. แผนการพัฒนาระยะถัดไป (Next Steps &amp; Roadmap)</h2>
+            <span class="slide-tag" style="background:rgba(255,255,255,0.18); color:#fff;">Future Roadmap</span>
+        </div>
+        <div class="grid-3" style="margin:auto 0;">
+            <div class="card" style="background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.25); color:#fff;">
+                <h3 style="color:#7dd3fc;">Phase 1.6: Post-hydration</h3>
+                <p style="font-size:15px;">เพิ่มระบบสารน้ำและอิเล็กโทรไลต์หลังให้เคมีบำบัด เชื่อมโยงกับ Regimen และแสดงผลครบทั้ง 3 ฝ่าย</p>
+            </div>
+            <div class="card" style="background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.25); color:#fff;">
+                <h3 style="color:#7dd3fc;">Phase 1.7: Home-medication</h3>
+                <p style="font-size:15px;">เพิ่มระบบยากลับบ้าน (Delayed Antiemetics / Supportive meds) พร้อมคำแนะนำผู้ป่วย</p>
+            </div>
+            <div class="card" style="background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.25); color:#fff;">
+                <h3 style="color:#fde047;">Phase 2.0: HOSxP Integration</h3>
+                <p style="font-size:15px;">เชื่อมต่อฐานข้อมูล <strong>HOSxP</strong> (Read-Only) ดึงชื่อผู้ป่วย, น้ำหนัก/ส่วนสูง, ผล Lab (SCr/CBC) และประวัติแพ้ยาอัตโนมัติเมื่อได้รับอนุมัติ</p>
+            </div>
+        </div>
+        <div class="slide-footer">
+            <span>ขอบคุณครับ — COPS™ Oncology Development Team (SPR Hospital)</span>
+            <span>12 / 12</span>
+        </div>
+    </section>
+
+</div>
+
+<div class="controls">
+    <button onclick="prevSlide()"><i class="bi bi-arrow-left"></i> ก่อนหน้า</button>
+    <button onclick="nextSlide()">ถัดไป <i class="bi bi-arrow-right"></i></button>
+    <button onclick="window.print()"><i class="bi bi-printer-fill"></i> พิมพ์ / PDF</button>
+</div>
+
+<script>
+    const slides = document.querySelectorAll('.slide');
+    let current = 0;
+
+    function showSlide(index) {
+        slides[current].classList.remove('active');
+        current = (index + slides.length) % slides.length;
+        slides[current].classList.add('active');
+    }
+    function nextSlide() { showSlide(current + 1); }
+    function prevSlide() { showSlide(current - 1); }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') nextSlide();
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') prevSlide();
+    });
+</script>
+</body>
+</html>
