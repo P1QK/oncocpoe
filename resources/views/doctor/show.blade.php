@@ -225,4 +225,87 @@
         </table>
     </div>
 </div>
+
+<!-- รายการ Post-medication (เช่น MESNA 0-3-6 ชม.) -->
+@php
+    $postMeds = $order->supportiveMeds->where('category', 'post_medication');
+@endphp
+@if($postMeds->isNotEmpty())
+    <div class="card card-medical bg-white mt-4 border-start border-4" style="border-left-color: #6f42c1 !important;">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center" style="background-color: #f3e8ff;">
+            <span class="fw-bold" style="color: #5b21b6;"><i class="bi bi-clock-history me-1"></i> รายการ Post-medication (ยาหลัง/ระหว่างให้เคมีบำบัด เช่น MESNA)</span>
+            <span class="badge text-white" style="background-color: #6f42c1;">{{ $postMeds->count() }} รายการ</span>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-2">
+                @foreach($postMeds as $pm)
+                    <div class="col-md-4">
+                        <div class="border rounded-2 p-2 bg-light small h-100">
+                            <div class="fw-bold" style="color: #5b21b6;">{{ $pm->sm_name }}</div>
+                            <div class="mt-1">
+                                <span class="badge bg-danger-subtle text-danger">{{ $pm->dose }}</span>
+                                @if($pm->route)<span class="badge bg-white text-dark border ms-1">{{ $pm->route }}</span>@endif
+                            </div>
+                            @if($pm->instruction)<div class="text-secondary mt-1">{{ $pm->instruction }}</div>@endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
+<!-- รายการ Post-hydration (สารน้ำและอิเล็กโทรไลต์หลังเคมีบำบัด) -->
+@php
+    $postHydrations = $order->supportiveMeds->where('category', 'post_hydration');
+@endphp
+@if($postHydrations->isNotEmpty())
+    <div class="card card-medical bg-white mt-4 border-start border-4 border-success">
+        <div class="card-header bg-success-subtle py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-success-emphasis"><i class="bi bi-droplet-half text-success me-1"></i> รายการ Post-hydration (สารน้ำและอิเล็กโทรไลต์หลังเคมีบำบัด)</span>
+            <span class="badge bg-success text-white">{{ $postHydrations->count() }} รายการ</span>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-2">
+                @foreach($postHydrations as $poh)
+                    <div class="col-md-6">
+                        <div class="border rounded-2 p-2 bg-light small h-100">
+                            <span class="fw-bold text-success">{{ $poh->sm_name }}</span>
+                            <span class="badge bg-success-subtle text-success ms-1">{{ $poh->dose }}</span>
+                            @if($poh->route)<span class="badge bg-white text-dark border ms-1">{{ $poh->route }}</span>@endif
+                            @if($poh->instruction)<div class="text-secondary mt-1">{{ $poh->instruction }}</div>@endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
+
+<!-- รายการ Home-medication (ยากลับบ้านหลังรับยาเคมีบำบัด) -->
+@php
+    $homeMeds = $order->supportiveMeds->where('category', 'home_med');
+@endphp
+@if($homeMeds->isNotEmpty())
+    <div class="card card-medical bg-white mt-4 border-start border-4 border-warning">
+        <div class="card-header bg-warning-subtle py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-dark"><i class="bi bi-house-heart-fill text-warning me-1"></i> รายการ Home-medication (ยากลับบ้าน)</span>
+            <span class="badge bg-warning text-dark">{{ $homeMeds->count() }} รายการ</span>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-2">
+                @foreach($homeMeds as $hm)
+                    <div class="col-md-6">
+                        <div class="border rounded-2 p-2 bg-light small h-100">
+                            <span class="fw-bold text-dark">{{ $hm->sm_name }}</span>
+                            <span class="badge bg-warning-subtle text-dark border border-warning ms-1">{{ $hm->dose }}</span>
+                            @if($hm->route)<span class="badge bg-white text-dark border ms-1">{{ $hm->route }}</span>@endif
+                            @if($hm->instruction)<div class="text-secondary mt-1">{{ $hm->instruction }}</div>@endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
 @endsection

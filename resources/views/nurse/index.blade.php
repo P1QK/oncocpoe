@@ -281,6 +281,75 @@
                 </table>
             </div>
         </div>
+
+        <!-- แถบแสดงรายการ Post-medication (เช่น MESNA 0-3-6 ชม.) ใต้ตารางยาเคมีบำบัด -->
+        @if(isset($patient->post_meds) && $patient->post_meds->isNotEmpty())
+            <div class="px-4 py-2 border-top" style="background-color: #f3e8ff;">
+                <div class="d-flex align-items-start flex-wrap gap-2 small">
+                    <span class="fw-bold text-nowrap mt-1" style="color: #5b21b6;">
+                        <i class="bi bi-clock-history me-1"></i>Post-medication (หลัง/ระหว่างให้เคมีบำบัด):
+                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($patient->post_meds as $pm)
+                            <span class="badge bg-white text-dark border px-2 py-1 text-start" style="border-color: #6f42c1 !important;" title="{{ $pm->instruction }}">
+                                <strong style="color: #5b21b6;">{{ $pm->sm_name }}</strong>
+                                <span class="text-danger fw-bold">{{ $pm->dose }}</span>
+                                @if($pm->route)({{ $pm->route }})@endif
+                                @if($pm->instruction)
+                                    <span class="text-secondary fw-normal">&mdash; {{ $pm->instruction }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- แถบแสดงรายการ Post-hydration (สารน้ำหลังให้ยาเคมีบำบัด) -->
+        @if(isset($patient->post_hydrations) && $patient->post_hydrations->isNotEmpty())
+            <div class="px-4 py-2 bg-success-subtle border-top">
+                <div class="d-flex align-items-start flex-wrap gap-2 small">
+                    <span class="fw-bold text-success-emphasis text-nowrap mt-1">
+                        <i class="bi bi-droplet-half text-success me-1"></i>Post-hydration (ให้สารน้ำหลังเคมีบำบัด):
+                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($patient->post_hydrations as $poh)
+                            <span class="badge bg-white text-dark border border-success px-2 py-1 text-start" title="{{ $poh->instruction }}">
+                                <strong class="text-success">{{ $poh->sm_name }}</strong>
+                                {{ $poh->dose }}
+                                @if($poh->route)({{ $poh->route }})@endif
+                                @if($poh->instruction)
+                                    <span class="text-secondary fw-normal">&mdash; {{ $poh->instruction }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- แถบแสดงรายการ Home-medication (ยากลับบ้าน) -->
+        @if(isset($patient->home_meds) && $patient->home_meds->isNotEmpty())
+            <div class="px-4 py-2 bg-warning-subtle border-top">
+                <div class="d-flex align-items-start flex-wrap gap-2 small">
+                    <span class="fw-bold text-dark text-nowrap mt-1">
+                        <i class="bi bi-house-heart-fill text-warning me-1"></i>Home-medication (ยากลับบ้าน):
+                    </span>
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach($patient->home_meds as $hm)
+                            <span class="badge bg-white text-dark border border-warning px-2 py-1 text-start" title="{{ $hm->instruction }}">
+                                <strong class="text-dark">{{ $hm->sm_name }}</strong>
+                                {{ $hm->dose }}
+                                @if($hm->route)({{ $hm->route }})@endif
+                                @if($hm->instruction)
+                                    <span class="text-secondary fw-normal">&mdash; {{ $hm->instruction }}</span>
+                                @endif
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 @empty
     <div class="card card-medical bg-white">

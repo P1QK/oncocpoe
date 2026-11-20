@@ -90,6 +90,16 @@ class DoctorController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        $postHydrations = SupportiveMed::where('category', 'post_hydration')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
+        $homeMeds = SupportiveMed::where('category', 'home_med')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get();
+
         // Prepare JSON structure for front-end dynamic calculation
         $regimensJson = $regimens->map(function ($reg) {
             return [
@@ -140,7 +150,9 @@ class DoctorController extends Controller
             'units',
             'preMedAntiemetics',
             'preMedHypersensitivity',
-            'preHydrations'
+            'preHydrations',
+            'postHydrations',
+            'homeMeds'
         ));
     }
 

@@ -78,6 +78,15 @@ class NurseController extends Controller
                 'pre_hydrations'    => optional($header)->supportiveMeds
                     ? $header->supportiveMeds->where('category', 'pre_hydration')->values()
                     : collect(),
+                'post_meds'         => optional($header)->supportiveMeds
+                    ? $header->supportiveMeds->where('category', 'post_medication')->values()
+                    : collect(),
+                'post_hydrations'   => optional($header)->supportiveMeds
+                    ? $header->supportiveMeds->where('category', 'post_hydration')->values()
+                    : collect(),
+                'home_meds'         => optional($header)->supportiveMeds
+                    ? $header->supportiveMeds->where('category', 'home_med')->values()
+                    : collect(),
                 'items'             => $items->sortBy('or_orderno')->values(),
             ];
         })->values();

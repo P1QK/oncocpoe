@@ -308,7 +308,7 @@
                             <th style="min-width: 165px;" class="bg-warning text-dark">ปรับลดเฉพาะตัว (%)<br><small class="fw-normal">ปรับรายตัวยาได้</small></th>
                             <th style="width: 195px;" class="bg-danger">ขนาดยาใหม่ที่ให้จริง<br>(Final Dose, mg)</th>
                             <th style="min-width: 145px;">สารน้ำ (Diluent)</th>
-                            <th style="width: 105px;">ปริมาตรสารน้ำ<br>(mL)</th>
+                            <th style="min-width: 145px;">ปริมาตรสารน้ำ<br>(mL)</th>
                             <th style="min-width: 140px;">วิถีทาง / เวลาให้ยา</th>
                             <th style="width: 80px;">เริ่ม Day</th>
                             <th style="width: 85px;">ให้กี่วัน<br>(reg_d)</th>
@@ -520,6 +520,252 @@
                                 <div class="col-12 mt-1">
                                     <input type="text" name="pre_meds[{{ $phKey }}][instruction]" id="premed_inst_{{ $phKey }}"
                                            class="form-control form-control-sm text-secondary" value="{{ $ph->default_instruction }}" placeholder="อัตราเร็ว / ระยะเวลาหยด">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 5: POST-MEDICATION (MESNA Auto-Calculator สำหรับ Ifosfamide / High-dose Cyclophosphamide) -->
+    <div class="card card-medical bg-white mb-4 border-top border-4" style="border-top-color: #6f42c1 !important;">
+        <div class="card-header py-2 d-flex justify-content-between align-items-center flex-wrap gap-2" style="background-color: #f3e8ff;">
+            <span class="fw-bold" style="color: #5b21b6;">
+                <i class="bi bi-clock-history me-2"></i>ส่วนที่ 5: Post-medication &mdash; MESNA Uroprotection (สำหรับ Ifosfamide / High-dose Cyclophosphamide)
+            </span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-white text-dark border" id="mesnaRefDrugBadge">ยังไม่ได้เปิดใช้ MESNA</span>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="mesnaEnabledChk" onchange="toggleMesnaSection()">
+                    <label class="form-check-label fw-bold small" style="color: #5b21b6;" for="mesnaEnabledChk">เปิดใช้ MESNA</label>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- แถบแจ้งเตือนอัตโนมัติเมื่อตรวจพบ Ifosfamide / Cyclophosphamide -->
+            <div id="mesnaAutoAlert" class="alert alert-warning py-2 px-3 small mb-3" style="display: none;"></div>
+
+            <div id="mesnaCalculatorBody" class="opacity-50">
+                <div class="row g-3 align-items-end mb-3 pb-3 border-bottom">
+                    <!-- 1. สัดส่วน % MESNA -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold small mb-1" style="color: #5b21b6;">
+                            1. สัดส่วนขนาด MESNA รวม (% ของขนาดยาหลัก: 60&ndash;120%):
+                        </label>
+                        <div class="input-group input-group-sm mb-1">
+                            <span class="input-group-text bg-white fw-semibold">สัดส่วน</span>
+                            <input type="number" id="mesnaPercentInput" class="form-control text-center fw-bold text-danger"
+                                   value="60" min="20" max="200" step="5" oninput="updateMesnaCalculation(true)">
+                            <span class="input-group-text bg-white fw-bold">%</span>
+                            <span class="input-group-text bg-light fw-bold" id="mesnaTotalDisplay">รวม 0.00 mg</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" style="font-size: 0.72rem;" onclick="setMesnaPercent(60)">60% (20% &times; 3)</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" style="font-size: 0.72rem;" onclick="setMesnaPercent(80)">80%</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" style="font-size: 0.72rem;" onclick="setMesnaPercent(100)">100%</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2 fw-semibold" style="font-size: 0.72rem;" onclick="setMesnaPercent(120)">120%</button>
+                        </div>
+                    </div>
+
+                    <!-- 2. ตัวเลือกวิธีผสม MESNA ที่ชั่วโมงที่ 0 (ครั้งที่ 1/3) -->
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold small mb-1 text-dark">
+                            2. วิธีบริหารยา MESNA ที่ชั่วโมงที่ 0 (ครั้งที่ 1/3):
+                        </label>
+                        <div class="d-flex flex-column gap-1 bg-light p-2 rounded-2 border">
+                            <div class="form-check mb-0 small">
+                                <input class="form-check-input" type="radio" name="mesna_hr0_mode" id="mesnaHr0Admix" value="admix" checked onchange="updateMesnaCalculation(true)">
+                                <label class="form-check-label fw-semibold text-primary" for="mesnaHr0Admix">
+                                    <i class="bi bi-flask me-1"></i>ผสมลงไปกับขวดยาเคมีบำบัดเลย (Admixed in Chemo Bag)
+                                </label>
+                            </div>
+                            <div class="form-check mb-0 small">
+                                <input class="form-check-input" type="radio" name="mesna_hr0_mode" id="mesnaHr0Separate" value="separate" onchange="updateMesnaCalculation(true)">
+                                <label class="form-check-label fw-semibold text-dark" for="mesnaHr0Separate">
+                                    <i class="bi bi-droplet me-1"></i>แยกไปผสมกับน้ำเกลือต่างหาก (Separate NSS Bag)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. ปริมาตร NSS สำหรับโดสที่แยกผสม -->
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold small mb-1 text-secondary">
+                            3. ปริมาตรน้ำเกลือ (สำหรับโดสที่แยกผสม):
+                        </label>
+                        <select id="mesnaNssVolSelect" class="form-select form-select-sm" onchange="updateMesnaCalculation(true)">
+                            <option value="50 mL">NSS 50 mL (IV drip in 15 mins)</option>
+                            <option value="100 mL" selected>NSS 100 mL (IV drip in 15-30 mins)</option>
+                            <option value="250 mL">NSS 250 mL (IV drip in 30 mins)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ตารางแบ่งให้ MESNA 3 ครั้ง (0, +3, +6 ชั่วโมง) -->
+                <div class="row g-2">
+                    @foreach([
+                        ['key' => 'POST_MESNA_1', 'no' => 1, 'hr' => '0 ชม. (เริ่มให้ยา)', 'badge' => 'ครั้งที่ 1/3 (0 hr)'],
+                        ['key' => 'POST_MESNA_2', 'no' => 2, 'hr' => '+3 ชม. หลังเริ่มยา', 'badge' => 'ครั้งที่ 2/3 (+3 hrs)'],
+                        ['key' => 'POST_MESNA_3', 'no' => 3, 'hr' => '+6 ชม. หลังเริ่มยา', 'badge' => 'ครั้งที่ 3/3 (+6 hrs)'],
+                    ] as $mDose)
+                        <div class="col-md-4">
+                            <div class="border rounded-2 p-2 bg-light h-100 mesna-dose-card">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge text-white" style="background-color: #6f42c1;">{{ $mDose['badge'] }}</span>
+                                    <small class="text-secondary fw-semibold">{{ $mDose['hr'] }}</small>
+                                </div>
+                                <input type="hidden" class="mesna-input" name="pre_meds[{{ $mDose['key'] }}][enabled]" id="mesna_enabled_{{ $mDose['no'] }}" value="1" disabled>
+                                <input type="hidden" class="mesna-input" name="pre_meds[{{ $mDose['key'] }}][sm_code]" value="{{ $mDose['key'] }}" disabled>
+                                <input type="hidden" class="mesna-input" name="pre_meds[{{ $mDose['key'] }}][sm_name]" value="MESNA inj. ({{ $mDose['badge'] }})" disabled>
+                                <input type="hidden" class="mesna-input" name="pre_meds[{{ $mDose['key'] }}][category]" value="post_medication" disabled>
+
+                                <div class="row g-1 mb-1">
+                                    <div class="col-7">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                            <input type="text" class="form-control fw-bold text-danger mesna-input"
+                                                   name="pre_meds[{{ $mDose['key'] }}][dose]" id="mesna_dose_{{ $mDose['no'] }}"
+                                                   value="0 mg" disabled>
+                                        </div>
+                                    </div>
+                                    <div class="col-5">
+                                        <input type="text" class="form-control form-control-sm text-center mesna-input"
+                                               name="pre_meds[{{ $mDose['key'] }}][route]" id="mesna_route_{{ $mDose['no'] }}"
+                                               value="IV" disabled>
+                                    </div>
+                                </div>
+                                <input type="text" class="form-control form-control-sm text-secondary mesna-input"
+                                       name="pre_meds[{{ $mDose['key'] }}][instruction]" id="mesna_inst_{{ $mDose['no'] }}"
+                                       value="" placeholder="วิธีผสมและเวลาให้ยา" disabled>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 6: POST-HYDRATION (การให้สารน้ำและอิเล็กโทรไลต์หลังเคมีบำบัด) -->
+    <div class="card card-medical bg-white mb-4 border-top border-4 border-success">
+        <div class="card-header bg-success-subtle text-dark py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="fw-bold text-success-emphasis">
+                <i class="bi bi-droplet-half text-success me-2"></i>ส่วนที่ 6: Post-hydration (สารน้ำและอิเล็กโทรไลต์หลังให้เคมีบำบัด &mdash; ปรับอัตโนมัติตาม Regimen)
+            </span>
+            <span class="badge bg-success text-white" id="postHydSelectedCounter">เลือกใช้: 0 รายการ</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                @foreach($postHydrations as $poh)
+                    @php $pohKey = $poh->sm_code; @endphp
+                    <div class="col-lg-6">
+                        <div class="border rounded-2 p-2 pre-med-row bg-light h-100" id="premed_row_{{ $pohKey }}" data-sm-code="{{ $pohKey }}" data-category="post_hydration" data-default-dose="{{ $poh->default_dose }}" data-default-route="{{ $poh->default_route }}" data-default-instruction="{{ $poh->default_instruction }}">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input pre-med-checkbox post-hyd-checkbox" type="checkbox" role="switch"
+                                           id="premed_chk_{{ $pohKey }}"
+                                           name="pre_meds[{{ $pohKey }}][enabled]" value="1"
+                                           onchange="togglePreMedRow('{{ $pohKey }}')">
+                                    <label class="form-check-label fw-bold text-dark" for="premed_chk_{{ $pohKey }}">
+                                        {{ $poh->sm_name }}
+                                    </label>
+                                </div>
+                                <span class="badge bg-secondary-subtle text-secondary pre-med-status-badge" id="premed_badge_{{ $pohKey }}">ไม่ใช้</span>
+                            </div>
+                            <input type="hidden" name="pre_meds[{{ $pohKey }}][sm_code]" value="{{ $poh->sm_code }}">
+                            <input type="hidden" name="pre_meds[{{ $pohKey }}][sm_name]" value="{{ $poh->sm_name }}">
+                            <input type="hidden" name="pre_meds[{{ $pohKey }}][category]" value="{{ $poh->category }}">
+
+                            <div class="row g-1 align-items-center mt-1 pre-med-fields" id="premed_fields_{{ $pohKey }}">
+                                <div class="col-5">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                        <input type="text" name="pre_meds[{{ $pohKey }}][dose]" id="premed_dose_{{ $pohKey }}"
+                                               class="form-control fw-bold text-success" value="{{ $poh->default_dose }}">
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="pre_meds[{{ $pohKey }}][route]" id="premed_route_{{ $pohKey }}"
+                                           class="form-control form-control-sm text-center" value="{{ $poh->default_route }}" placeholder="Route">
+                                </div>
+                                <div class="col-4">
+                                    @if(!empty($poh->dose_options) && is_array($poh->dose_options))
+                                        <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                            @foreach($poh->dose_options as $opt)
+                                                <button type="button" class="btn btn-outline-success py-0 px-1" style="font-size: 0.67rem;"
+                                                        onclick="setPreMedDose('{{ $pohKey }}', '{{ $opt }}')">{{ $opt }}</button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <input type="text" name="pre_meds[{{ $pohKey }}][instruction]" id="premed_inst_{{ $pohKey }}"
+                                           class="form-control form-control-sm text-secondary" value="{{ $poh->default_instruction }}" placeholder="อัตราเร็ว / ระยะเวลาหยด / คำแนะนำ">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 7: HOME-MEDICATION (ยากลับบ้านหลังรับยาเคมีบำบัด) -->
+    <div class="card card-medical bg-white mb-4 border-top border-4 border-warning">
+        <div class="card-header bg-warning-subtle text-dark py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="fw-bold">
+                <i class="bi bi-house-heart-fill text-warning me-2"></i>ส่วนที่ 7: Home-medication (ยากลับบ้านหลังรับยาเคมีบำบัด &mdash; ปรับอัตโนมัติตาม Regimen)
+            </span>
+            <span class="badge bg-warning text-dark" id="homeMedSelectedCounter">เลือกใช้: 0 รายการ</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-2">
+                @foreach($homeMeds as $hm)
+                    @php $hmKey = $hm->sm_code; @endphp
+                    <div class="col-lg-6">
+                        <div class="border rounded-2 p-2 pre-med-row bg-light h-100" id="premed_row_{{ $hmKey }}" data-sm-code="{{ $hmKey }}" data-category="home_med" data-default-dose="{{ $hm->default_dose }}" data-default-route="{{ $hm->default_route }}" data-default-instruction="{{ $hm->default_instruction }}">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input pre-med-checkbox home-med-checkbox" type="checkbox" role="switch"
+                                           id="premed_chk_{{ $hmKey }}"
+                                           name="pre_meds[{{ $hmKey }}][enabled]" value="1"
+                                           onchange="togglePreMedRow('{{ $hmKey }}')">
+                                    <label class="form-check-label fw-bold text-dark" for="premed_chk_{{ $hmKey }}">
+                                        {{ $hm->sm_name }}
+                                    </label>
+                                </div>
+                                <span class="badge bg-secondary-subtle text-secondary pre-med-status-badge" id="premed_badge_{{ $hmKey }}">ไม่ใช้</span>
+                            </div>
+                            <input type="hidden" name="pre_meds[{{ $hmKey }}][sm_code]" value="{{ $hm->sm_code }}">
+                            <input type="hidden" name="pre_meds[{{ $hmKey }}][sm_name]" value="{{ $hm->sm_name }}">
+                            <input type="hidden" name="pre_meds[{{ $hmKey }}][category]" value="{{ $hm->category }}">
+
+                            <div class="row g-1 align-items-center mt-1 pre-med-fields" id="premed_fields_{{ $hmKey }}">
+                                <div class="col-5">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white px-1 small">ขนาด</span>
+                                        <input type="text" name="pre_meds[{{ $hmKey }}][dose]" id="premed_dose_{{ $hmKey }}"
+                                               class="form-control fw-bold text-dark" value="{{ $hm->default_dose }}">
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <input type="text" name="pre_meds[{{ $hmKey }}][route]" id="premed_route_{{ $hmKey }}"
+                                           class="form-control form-control-sm text-center" value="{{ $hm->default_route }}" placeholder="Route">
+                                </div>
+                                <div class="col-4">
+                                    @if(!empty($hm->dose_options) && is_array($hm->dose_options))
+                                        <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                            @foreach($hm->dose_options as $opt)
+                                                <button type="button" class="btn btn-outline-dark py-0 px-1" style="font-size: 0.67rem;"
+                                                        onclick="setPreMedDose('{{ $hmKey }}', '{{ $opt }}')">{{ $opt }}</button>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="col-12 mt-1">
+                                    <input type="text" name="pre_meds[{{ $hmKey }}][instruction]" id="premed_inst_{{ $hmKey }}"
+                                           class="form-control form-control-sm text-secondary" value="{{ $hm->default_instruction }}" placeholder="วิธีรับประทาน / คำแนะนำผู้ป่วย">
                                 </div>
                             </div>
                         </div>
@@ -891,14 +1137,15 @@
                             ${solOptions}
                         </select>
                     </td>
-                    <td>
+                    <td style="min-width: 145px;">
                         <div class="input-group input-group-sm">
                             <input type="number" step="1" min="0"
                                 name="items[${idx}][solvol]"
                                 id="solvol_${idx}"
-                                class="form-control text-end"
+                                class="form-control text-end fw-bold fs-6 px-2"
+                                style="min-width: 80px;"
                                 value="${item.solvol}" ${disabledAttr}>
-                            <span class="input-group-text">mL</span>
+                            <span class="input-group-text px-2 fw-semibold">mL</span>
                         </div>
                     </td>
                     <td>
@@ -1076,6 +1323,7 @@
         });
 
         toggleReasonBoxVisibility();
+        updateMesnaCalculation(false);
     }
 
     function updateBandingUI(idx, rawDose, finalDose, step, conc) {
@@ -1232,6 +1480,7 @@
             updateBandingUI(idx, rawReducedDose, finalDose, step, currentItems[idx].dg_conc);
         }
         toggleReasonBoxVisibility();
+        updateMesnaCalculation(false);
     }
 
     function onFinalDoseManualChange(idx, val) {
@@ -1647,15 +1896,146 @@
     }
 
     function updatePreMedCounter() {
-        const preMedTotal = document.querySelectorAll('.pre-med-checkbox:not(.pre-hyd-checkbox):checked').length;
+        const preMedTotal = document.querySelectorAll('.pre-med-checkbox:not(.pre-hyd-checkbox):not(.post-hyd-checkbox):not(.home-med-checkbox):checked').length;
         const preHydTotal = document.querySelectorAll('.pre-hyd-checkbox:checked').length;
+        const postHydTotal = document.querySelectorAll('.post-hyd-checkbox:checked').length;
+        const homeMedTotal = document.querySelectorAll('.home-med-checkbox:checked').length;
         const counterEl = document.getElementById('preMedSelectedCounter');
         const hydCounterEl = document.getElementById('preHydSelectedCounter');
-        if (counterEl) {
-            counterEl.innerText = `เลือกใช้: ${preMedTotal} รายการ`;
+        const postHydCounterEl = document.getElementById('postHydSelectedCounter');
+        const homeMedCounterEl = document.getElementById('homeMedSelectedCounter');
+        if (counterEl) counterEl.innerText = `เลือกใช้: ${preMedTotal} รายการ`;
+        if (hydCounterEl) hydCounterEl.innerText = `เลือกใช้: ${preHydTotal} รายการ`;
+        if (postHydCounterEl) postHydCounterEl.innerText = `เลือกใช้: ${postHydTotal} รายการ`;
+        if (homeMedCounterEl) homeMedCounterEl.innerText = `เลือกใช้: ${homeMedTotal} รายการ`;
+    }
+
+    let mesnaManualToggle = false;
+
+    function toggleMesnaSection() {
+        mesnaManualToggle = true;
+        const chk = document.getElementById('mesnaEnabledChk');
+        const isEnabled = chk && chk.checked;
+        const body = document.getElementById('mesnaCalculatorBody');
+
+        if (body) {
+            body.classList.toggle('opacity-50', !isEnabled);
         }
-        if (hydCounterEl) {
-            hydCounterEl.innerText = `เลือกใช้: ${preHydTotal} รายการ`;
+        document.querySelectorAll('.mesna-input').forEach(inp => {
+            inp.disabled = !isEnabled;
+        });
+        if (isEnabled) {
+            updateMesnaCalculation(true);
+        }
+    }
+
+    function setMesnaPercent(pct) {
+        const pctEl = document.getElementById('mesnaPercentInput');
+        if (pctEl) pctEl.value = pct;
+        const chk = document.getElementById('mesnaEnabledChk');
+        if (chk && !chk.checked) {
+            chk.checked = true;
+            toggleMesnaSection();
+        } else {
+            updateMesnaCalculation(true);
+        }
+    }
+
+    function updateMesnaCalculation(forceUpdateValues) {
+        const chk = document.getElementById('mesnaEnabledChk');
+        const alertEl = document.getElementById('mesnaAutoAlert');
+        const refBadge = document.getElementById('mesnaRefDrugBadge');
+        const totalEl = document.getElementById('mesnaTotalDisplay');
+        const pctEl = document.getElementById('mesnaPercentInput');
+        const nssVolEl = document.getElementById('mesnaNssVolSelect');
+        const hr0ModeEl = document.querySelector('input[name="mesna_hr0_mode"]:checked');
+
+        if (!chk) return;
+
+        // ตรวจหายา Ifosfamide (IFOS) หรือ Cyclophosphamide (CYCLO) ที่เปิดสั่งใช้อยู่ในตาราง
+        const activeItems = currentItems.filter(i => !i.is_off);
+        const ifosItem = activeItems.find(i => (i.medcode || '').toUpperCase().startsWith('IFOS'));
+        const cycloItem = activeItems.find(i => (i.medcode || '').toUpperCase().startsWith('CYCLO'));
+        const refItem = ifosItem || cycloItem || null;
+
+        const isIfos = !!ifosItem;
+        const isHighDoseCyclo = !!(cycloItem && (cycloItem.base_dose >= 1000 || cycloItem.final_dose >= 1500));
+
+        // เปิด MESNA อัตโนมัติเมื่อมี Ifosfamide หรือ High-dose Cyclophosphamide (หากแพทย์ยังไม่ได้ปิดเอง)
+        if (!mesnaManualToggle) {
+            const shouldAutoEnable = isIfos || isHighDoseCyclo;
+            chk.checked = shouldAutoEnable;
+            const body = document.getElementById('mesnaCalculatorBody');
+            if (body) body.classList.toggle('opacity-50', !shouldAutoEnable);
+            document.querySelectorAll('.mesna-input').forEach(inp => {
+                inp.disabled = !shouldAutoEnable;
+            });
+        }
+
+        if (alertEl) {
+            if (isIfos) {
+                alertEl.className = 'alert alert-danger py-2 px-3 small mb-3';
+                alertEl.innerHTML = `<i class="bi bi-exclamation-octagon-fill me-1"></i> <strong>ตรวจพบ Ifosfamide (${ifosItem.final_dose.toFixed(2)} mg):</strong> ระบบเปิดใช้งาน <strong>MESNA Uroprotection</strong> และคำนวณขนาดแบ่งให้ 3 ครั้ง (0-3-6 ชม.) อัตโนมัติ`;
+                alertEl.style.display = 'block';
+            } else if (isHighDoseCyclo) {
+                alertEl.className = 'alert alert-warning py-2 px-3 small mb-3';
+                alertEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>ตรวจพบ High-dose Cyclophosphamide (${cycloItem.final_dose.toFixed(2)} mg):</strong> แนะนำให้ใช้ <strong>MESNA Uroprotection</strong> เพื่อป้องกัน Hemorrhagic Cystitis`;
+                alertEl.style.display = 'block';
+            } else if (cycloItem) {
+                alertEl.className = 'alert alert-info py-2 px-3 small mb-3';
+                alertEl.innerHTML = `<i class="bi bi-info-circle-fill me-1"></i> ตรวจพบ Cyclophosphamide (${cycloItem.final_dose.toFixed(2)} mg) &mdash; หากต้องการใช้ MESNA สามารถเปิดสวิตช์ด้านขวาบนเพื่อให้ระบบคำนวณอัตโนมัติได้`;
+                alertEl.style.display = 'block';
+            } else {
+                alertEl.style.display = 'none';
+            }
+        }
+
+        const baseChemoDose = refItem ? (parseFloat(refItem.final_dose) || 0) : 0;
+        const pct = Math.min(200, Math.max(0, parseFloat(pctEl ? pctEl.value : 60) || 60));
+        const totalMesna = Math.round(baseChemoDose * (pct / 100) * 100) / 100;
+        const singleDose = Math.round((totalMesna / 3) * 100) / 100;
+        const nssVol = nssVolEl ? nssVolEl.value : '100 mL';
+        const hr0Mode = hr0ModeEl ? hr0ModeEl.value : 'admix';
+
+        if (refBadge) {
+            refBadge.innerText = refItem
+                ? `อ้างอิง: ${refItem.dg_name} (${baseChemoDose.toFixed(2)} mg)`
+                : (chk.checked ? 'MESNA (กำหนดขนาดเอง)' : 'ยังไม่ได้เปิดใช้ MESNA');
+        }
+        if (totalEl) {
+            totalEl.innerText = `รวม ${totalMesna.toFixed(0)} mg`;
+        }
+
+        const refDrugLabel = refItem ? refItem.dg_name : 'ยาเคมีบำบัด';
+        const hr0Route = hr0Mode === 'admix' ? 'IV (ผสมในขวดยา)' : `IV drip (${nssVol})`;
+        const hr0Inst = hr0Mode === 'admix'
+            ? `ชั่วโมงที่ 0 (ครั้งที่ 1/3): ผสม MESNA ลงในขวดยา ${refDrugLabel} เลย หยดพร้อมกัน (${pct}% รวม ${totalMesna.toFixed(0)} mg)`
+            : `ชั่วโมงที่ 0 (ครั้งที่ 1/3): แยกผสม MESNA ใน NSS ${nssVol} ต่างหาก IV drip in 15-30 mins ก่อน/พร้อมเริ่ม ${refDrugLabel}`;
+
+        const hr3Inst = `ชั่วโมงที่ +3 (ครั้งที่ 2/3): แยกผสม MESNA ใน NSS ${nssVol} IV drip in 15-30 mins หลังเริ่มยา 3 ชั่วโมง`;
+        const hr6Inst = `ชั่วโมงที่ +6 (ครั้งที่ 3/3): แยกผสม MESNA ใน NSS ${nssVol} IV drip in 15-30 mins หลังเริ่มยา 6 ชั่วโมง`;
+
+        if (forceUpdateValues || refItem) {
+            const d1 = document.getElementById('mesna_dose_1');
+            const d2 = document.getElementById('mesna_dose_2');
+            const d3 = document.getElementById('mesna_dose_3');
+            if (d1) d1.value = `${singleDose.toFixed(0)} mg`;
+            if (d2) d2.value = `${singleDose.toFixed(0)} mg`;
+            if (d3) d3.value = `${singleDose.toFixed(0)} mg`;
+
+            const r1 = document.getElementById('mesna_route_1');
+            const r2 = document.getElementById('mesna_route_2');
+            const r3 = document.getElementById('mesna_route_3');
+            if (r1) r1.value = hr0Route;
+            if (r2) r2.value = `IV drip (${nssVol})`;
+            if (r3) r3.value = `IV drip (${nssVol})`;
+
+            const i1 = document.getElementById('mesna_inst_1');
+            const i2 = document.getElementById('mesna_inst_2');
+            const i3 = document.getElementById('mesna_inst_3');
+            if (i1) i1.value = hr0Inst;
+            if (i2) i2.value = hr3Inst;
+            if (i3) i3.value = hr6Inst;
         }
     }
 
@@ -1664,6 +2044,7 @@
         document.querySelectorAll('.pre-med-row').forEach(row => {
             togglePreMedRow(row.getAttribute('data-sm-code'));
         });
+        updateMesnaCalculation(false);
         document.querySelectorAll('.calc-trigger').forEach(el => {
             el.addEventListener('input', calculateBsaAndGfr);
             el.addEventListener('change', calculateBsaAndGfr);

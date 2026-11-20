@@ -3,7 +3,7 @@
 > **ชื่อระบบ:** COPS™ Oncology — ระบบบริหารจัดการคำสั่งใช้ยา การเตรียมยา และการบริหารยาเคมีบำบัดชนิดฉีด  
 > **หน่วยงาน:** Sterile Products Pharmacy Service, SPR Hospital  
 > **เทคโนโลยีหลัก:** Laravel 12 (PHP 8.3.30 / MAMP), MySQL (`oncospr`), Bootstrap 5, JavaScript (ES6 / Fetch AJAX), JsBarcode  
-> **อัปเดตล่าสุด:** 20 พฤศจิกายน 2026 (Version 1.5)
+> **อัปเดตล่าสุด:** 20 พฤศจิกายน 2026 (Version 1.8)
 
 ---
 
@@ -117,11 +117,15 @@ erDiagram
 | **v1.3.1** | 18 พ.ย. 2026 | Doctor Cycle Auto-Check & Home | 1) เพิ่ม Endpoint `/doctor/patient-history` ตรวจสอบประวัติผู้ป่วยจาก `HN` และเติมค่า **Cycle ถัดไปอัตโนมัติ** (แพทย์แก้ไขได้)<br>2) ปรับการ์ดหน้าหลัก `home.blade.php` แสดงยอด **เฉพาะวันปัจจุบัน** เป็นตัวเลขหลัก และยอดสะสมเป็นตัวอักษรเล็กด้านล่าง<br>3) บันทึกกฎการรัน `php artisan serve` (MAMP PHP + Socket) ลง `AGENTS.md` |
 | **v1.4** | 20 พ.ย. 2026 | Per-Drug Dose Reduction & Pre-medication | 1) เพิ่มปุ่มลัด **ปรับลดขนาดยาเฉพาะแต่ละตัวยา** (`0%` ถึง `-50%`) ใน `doctor/create` โดยคงแผงลดทั้งสูตรไว้ครบถ้วน<br>2) สร้างตาราง `supportive_meds`, `regimen_supportive_meds`, `order_supportive_meds` และพัฒนาระบบ **Pre-medication** (Antiemetics 6 รายการ + Anti-Hypersensitivity 5 รายการ พร้อมปุ่มปรับเพิ่มขนาด `Ondansetron inj.`) ผูกตาม Regimen และแสดงผลครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
 | **v1.5** | 20 พ.ย. 2026 | Pre-hydration | เพิ่มระบบ **Pre-hydration** (NSS, 5% D/NSS, KCl, MgSO4, 20% Mannitol, Furosemide) ผูกอัตโนมัติกับสูตร Cisplatin/AC และแสดงลำดับ **Pre-medication → Pre-hydration → Chemotherapy** ครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
+| **v1.6** | 20 พ.ย. 2026 | Post-medication (MESNA) | เพิ่มยา `IFOS` (Ifosfamide) ใน `medcyto` และพัฒนาระบบ **Post-medication (MESNA Auto-Calculator)** คำนวณขนาด MESNA อัตโนมัติ `60-120%` ของ Ifosfamide / High-dose Cyclophosphamide แบ่งให้ 3 ครั้งที่ `0, +3, +6` ชม. พร้อมตัวเลือกที่ชั่วโมง 0 (**ผสมลงขวดยาเคมีบำบัดเลย** หรือ **แยกผสม NSS ต่างหาก**) แสดงครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
+| **v1.7** | 20 พ.ย. 2026 | Post-hydration | เพิ่มระบบ **Post-hydration** (NSS, 5% D/NSS, KCl, MgSO4, Furosemide, Oral Hydration) ผูกอัตโนมัติกับสูตร Cisplatin/AC และขยายช่องปริมาตรสารน้ำในหน้าแพทย์ พร้อมแสดงผลครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
+| **v1.8** | 20 พ.ย. 2026 | Home-medication | เพิ่มระบบ **Home-medication** ครบ 11 รายการ (Dexamethasone, Ondansetron, Aprepitant, Olanzapine, Metoclopramide, Domperidone, **Lorazepam 0.5 mg**, Omeprazole, Loperamide, Paracetamol, Filgrastim) ผูกอัตโนมัติตาม Regimen ครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
 
 ---
 
 ## 6. แผนการพัฒนาระยะถัดไป (Roadmap)
 
-- [ ] **Phase 1.6:** พัฒนาส่วน **Post-hydration** (สารน้ำและอิเล็กโทรไลต์หลังให้เคมีบำบัด)
-- [ ] **Phase 1.7:** พัฒนาส่วน **Home-medication** (ยากลับบ้าน เช่น Delayed Antiemetics / Dexamethasone / Ondansetron / Olanzapine)
+- [x] **Phase 1.6:** พัฒนาส่วน **Post-medication (MESNA Auto-Calculator 0-3-6 ชม.)**
+- [x] **Phase 1.7:** พัฒนาส่วน **Post-hydration** (สารน้ำและอิเล็กโทรไลต์หลังให้เคมีบำบัด)
+- [x] **Phase 1.8:** พัฒนาส่วน **Home-medication** (ยากลับบ้าน 11 รายการรวม Lorazepam 0.5 mg)
 - [ ] **Phase 2.0 (เมื่อได้รับอนุมัติ):** เชื่อมต่อระบบโรงพยาบาล **HOSxP** (ดึงข้อมูลผู้ป่วย, น้ำหนัก/ส่วนสูง, ผล Lab `SCr`/`CBC`, และประวัติแพ้ยาแบบ Read-Only อัตโนมัติ)
