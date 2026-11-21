@@ -3,7 +3,7 @@
 > **ชื่อระบบ:** COPS™ Oncology — ระบบบริหารจัดการคำสั่งใช้ยา การเตรียมยา และการบริหารยาเคมีบำบัดชนิดฉีด  
 > **หน่วยงาน:** Sterile Products Pharmacy Service, SPR Hospital  
 > **เทคโนโลยีหลัก:** Laravel 12 (PHP 8.3.30 / MAMP), MySQL (`oncospr`), Bootstrap 5, JavaScript (ES6 / Fetch AJAX), JsBarcode  
-> **อัปเดตล่าสุด:** 20 พฤศจิกายน 2026 (Version 1.8)
+> **อัปเดตล่าสุด:** 21 พฤศจิกายน 2026 (Version 1.9)
 
 ---
 
@@ -120,6 +120,7 @@ erDiagram
 | **v1.6** | 20 พ.ย. 2026 | Post-medication (MESNA) | เพิ่มยา `IFOS` (Ifosfamide) ใน `medcyto` และพัฒนาระบบ **Post-medication (MESNA Auto-Calculator)** คำนวณขนาด MESNA อัตโนมัติ `60-120%` ของ Ifosfamide / High-dose Cyclophosphamide แบ่งให้ 3 ครั้งที่ `0, +3, +6` ชม. พร้อมตัวเลือกที่ชั่วโมง 0 (**ผสมลงขวดยาเคมีบำบัดเลย** หรือ **แยกผสม NSS ต่างหาก**) แสดงครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
 | **v1.7** | 20 พ.ย. 2026 | Post-hydration | เพิ่มระบบ **Post-hydration** (NSS, 5% D/NSS, KCl, MgSO4, Furosemide, Oral Hydration) ผูกอัตโนมัติกับสูตร Cisplatin/AC และขยายช่องปริมาตรสารน้ำในหน้าแพทย์ พร้อมแสดงผลครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
 | **v1.8** | 20 พ.ย. 2026 | Home-medication | เพิ่มระบบ **Home-medication** ครบ 11 รายการ (Dexamethasone, Ondansetron, Aprepitant, Olanzapine, Metoclopramide, Domperidone, **Lorazepam 0.5 mg**, Omeprazole, Loperamide, Paracetamol, Filgrastim) ผูกอัตโนมัติตาม Regimen ครบทั้ง แพทย์ / เภสัชกร / พยาบาล |
+| **v1.9** | 21 พ.ย. 2026 | Regimen Management (5-Tab Supportive Care + Searchable Dropdown) | อัปเกรดหน้าจัดการสูตรยา (`regimens/index.blade.php` & `RegimenController`) ให้กำหนด **Pre-med, Pre-hydration, Post-med (MESNA), Post-hydration, และ Home-med** ได้ตั้งแต่ตอนสร้างสูตรยาใหม่ พร้อม Modal แก้ไขชุดยาสนับสนุนของสูตรยาเดิม, **Dropdown ค้นหาสูตรยาที่มี Textbox ในตัว**, และซิงค์อัตโนมัติไปยังหน้าแพทย์ |
 
 ---
 

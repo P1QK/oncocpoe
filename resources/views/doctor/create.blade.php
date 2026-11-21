@@ -1853,6 +1853,32 @@
             }
             togglePreMedRow(code);
         });
+
+        // ซิงค์ค่าตั้งต้นของ Post-medication (MESNA) จากสูตร Regimen หากมีการกำหนดไว้
+        const mesnaCfg = preMedsMap && preMedsMap['POST_MESNA'] ? preMedsMap['POST_MESNA'] : null;
+        const mesnaChk = document.getElementById('mesnaEnabledChk');
+        const mesnaPctEl = document.getElementById('mesnaPercentInput');
+        const mesnaNssEl = document.getElementById('mesnaNssVolSelect');
+        if (mesnaCfg && mesnaCfg.is_default && mesnaChk) {
+            mesnaManualToggle = true;
+            mesnaChk.checked = true;
+            if (mesnaPctEl && mesnaCfg.override_dose) {
+                mesnaPctEl.value = parseInt(mesnaCfg.override_dose, 10) || 60;
+            }
+            if (mesnaCfg.override_route) {
+                const parts = String(mesnaCfg.override_route).split('|');
+                const mode = parts[0] === 'separate' ? 'separate' : 'admix';
+                const nssVol = parts[1] || '100 mL';
+                const radio = document.getElementById(mode === 'separate' ? 'mesnaHr0Separate' : 'mesnaHr0Admix');
+                if (radio) radio.checked = true;
+                if (mesnaNssEl) mesnaNssEl.value = nssVol;
+            }
+            const body = document.getElementById('mesnaCalculatorBody');
+            if (body) body.classList.remove('opacity-50');
+            document.querySelectorAll('.mesna-input').forEach(inp => { inp.disabled = false; });
+        } else {
+            mesnaManualToggle = false;
+        }
     }
 
     function togglePreMedRow(code) {

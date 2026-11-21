@@ -93,6 +93,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [RegimenController::class, 'index'])->name('index');
         Route::post('/', [RegimenController::class, 'store'])->name('store');
         Route::post('/{rhId}/sequence', [RegimenController::class, 'updateSequence'])->name('sequence');
+        Route::post('/{rhId}/supportive', [RegimenController::class, 'updateSupportive'])->name('supportive');
         Route::delete('/{rhId}', [RegimenController::class, 'destroy'])->name('destroy');
     });
 
