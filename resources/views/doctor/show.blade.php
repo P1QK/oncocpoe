@@ -12,6 +12,12 @@
         <small class="text-secondary">สั่งใช้โดย: {{ $order->or_doctor_name ?? 'แพทย์ผู้สั่งรักษา' }} | วันที่เริ่มให้ยา: {{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}</small>
     </div>
     <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('reports.patients.profile', $order->or_hn) }}" class="btn btn-outline-info fw-semibold">
+            <i class="bi bi-person-vcard-fill me-1"></i> Profile ผู้ป่วย
+        </a>
+        <a href="{{ route('reports.visit', $order->or_id) }}" class="btn btn-outline-primary fw-semibold">
+            <i class="bi bi-clock-history me-1"></i> รายงานการรักษา &amp; เวลา
+        </a>
         @if(!$isCancelled)
             <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold shadow-sm">
                 <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)

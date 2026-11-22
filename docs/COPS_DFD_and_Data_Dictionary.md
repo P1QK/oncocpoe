@@ -3,7 +3,7 @@
 > **ระบบ:** COPS™ Oncology (Chemotherapy Ordering & Preparation System)  
 > **ฐานข้อมูล:** MySQL — `oncospr` (`utf8mb4_unicode_ci`)  
 > **หน่วยงาน:** Sterile Products Pharmacy Service, SPR Hospital  
-> **เวอร์ชันเอกสาร:** Version 2.3 (22 พฤศจิกายน 2026)  
+> **เวอร์ชันเอกสาร:** Version 2.4 (22 พฤศจิกายน 2026)  
 > **หมายเหตุ:** เอกสารฉบับนี้แยกต่างหากจากเอกสารงานพัฒนาระบบหลัก (`COPS_System_Documentation.md`) เพื่อใช้สำหรับงานออกแบบ วิเคราะห์ฐานข้อมูล และส่งมอบโครงการ
 
 ---
@@ -159,6 +159,7 @@ flowchart TD
 | `or_cycle` | `int` | NO | | `1` | รอบการรับยาเคมีบำบัด (Cycle Number) |
 | `or_image` | `longblob` | YES | | NULL | รูปภาพใบสั่งยาแนบ (รองรับระบบเดิม) |
 | `or_date` | `date` | YES | | NULL | วันที่เริ่มให้ยาเคมีบำบัด (Order Start Date) |
+| `or_created_at` | `timestamp` | YES | | NULL | วันและเวลาจริงที่แพทย์กดส่งคำสั่งใช้ยา (ใช้คำนวณ Turnaround Time) |
 | `or_prnflag` | `tinyint` | YES | | `1` | สถานะการพิมพ์ใบสั่งยา (0=ยังไม่พิมพ์, 1=พิมพ์แล้ว) |
 | `or_chkflag` | `tinyint` | YES | | `0` | สถานะเภสัชกรตรวจสอบคำสั่งแล้ว (0=ยังไม่ตรวจ, 1=ตรวจแล้ว) |
 | `or_prepflag` | `tinyint` | YES | | `0` | สถานะมีการเตรียมยาแล้ว (0=ยังไม่เตรียม, 1=เตรียมแล้ว) |
@@ -229,6 +230,8 @@ flowchart TD
 | `or_dispatched_at` | `timestamp` | YES | | NULL | วันและเวลาที่กดส่งยาออกจากห้องเตรียมยาไปยังหอผู้ป่วย |
 | `or_dispatched_by` | `varchar(150)` | YES | | NULL | ชื่อเภสัชกร/เจ้าหน้าที่ผู้กดส่งยา |
 | `or_send` | `int` | YES | | `0` | สถานะพยาบาลรับยาและบริหารยาให้ผู้ป่วยแล้ว (0=ยังไม่บริหาร, 1=บริหารยาแล้ว) |
+| `or_administered_at` | `timestamp` | YES | | NULL | วันและเวลาจริงที่พยาบาลกดยืนยันรับและบริหารยาให้ผู้ป่วย (5 Rights) |
+| `or_administered_by` | `varchar(150)` | YES | | NULL | ชื่อ-สกุลพยาบาลผู้ยืนยันรับและบริหารยา |
 | `or_id` | `varchar(20)` | YES | | NULL | รหัสเลขที่ใบสั่งยา (FK อ้างอิง `order_h.or_id`) |
 | `or_medcode` | `varchar(8)` | YES | | NULL | รหัสยาเคมีบำบัด (FK อ้างอิง `medcyto.dg_code`) |
 | `or_meddose` | `decimal(8,2)` | YES | | `0.00` | ขนาดยาที่ให้ในวันนั้น (mg) |

@@ -6,6 +6,7 @@ use App\Models\OncDayRecord;
 use App\Models\OrderHeader;
 use App\Models\Ward;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class NurseController extends Controller
@@ -140,7 +141,9 @@ class NurseController extends Controller
         }
 
         $query->update([
-            'or_send' => 1,
+            'or_send'            => 1,
+            'or_administered_at' => now(),
+            'or_administered_by' => Auth::user()->name ?? 'พยาบาลหอผู้ป่วย',
         ]);
 
         return back()->with('success', 'พยาบาลยืนยันการรับยาและตรวจสอบ 5 Rights เรียบร้อยแล้ว');

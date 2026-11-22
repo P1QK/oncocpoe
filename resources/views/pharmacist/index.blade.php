@@ -120,7 +120,9 @@
                         </td>
                         <td>
                             <div class="fw-bold">{{ $order->or_patname }}</div>
-                            <span class="badge bg-white text-dark border">HN: {{ $order->or_hn }}</span>
+                            <a href="{{ route('reports.patients.profile', $order->or_hn) }}" class="badge bg-white text-primary border border-primary-subtle text-decoration-none" title="คลิกเพื่อเปิดดู Profile การรับยาของผู้ป่วยรายนี้">
+                                <i class="bi bi-person-vcard me-1"></i>HN: {{ $order->or_hn }}
+                            </a>
                             @if($order->or_doctor_name)
                                 <small class="text-muted d-block mt-1">แพทย์: {{ $order->or_doctor_name }}</small>
                             @endif

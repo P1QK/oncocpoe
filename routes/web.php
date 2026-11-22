@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\MedcytoController;
 use App\Http\Controllers\NurseController;
+use App\Http\Controllers\PatientReportController;
 use App\Http\Controllers\PharmacistController;
 use App\Http\Controllers\RegimenController;
 use App\Models\Medcyto;
@@ -92,6 +93,13 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:superadmin,admin,nurse')->prefix('nurse')->name('nurse.')->group(function () {
         Route::get('/', [NurseController::class, 'index'])->name('index');
         Route::post('/acknowledge', [NurseController::class, 'acknowledge'])->name('acknowledge');
+    });
+
+    // 4.5 PATIENT PROFILE & TREATMENT REPORTS (Accessible by superadmin, admin, doctor, pharmacist)
+    Route::middleware('role:superadmin,admin,doctor,pharmacist')->prefix('reports')->name('reports.')->group(function () {
+        Route::get('/patients', [PatientReportController::class, 'index'])->name('patients.index');
+        Route::get('/patients/{hn}/profile', [PatientReportController::class, 'profile'])->name('patients.profile');
+        Route::get('/orders/{orId}/visit-report', [PatientReportController::class, 'visitReport'])->name('visit');
     });
 
     // 5. REGIMEN MASTER DATA (Accessible by superadmin and admin ONLY)

@@ -92,6 +92,14 @@
                         </li>
                     @endif
 
+                    @if(auth()->user()->canAccessDoctor() || auth()->user()->canAccessPharmacist())
+                        <li class="nav-item">
+                            <a class="nav-link nav-pill-role {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.patients.index') }}">
+                                <i class="bi bi-person-lines-fill me-1"></i> Profile ผู้ป่วย / รายงาน
+                            </a>
+                        </li>
+                    @endif
+
                     @if(auth()->user()->canAccessNurse())
                         <li class="nav-item">
                             <a class="nav-link nav-pill-role {{ request()->routeIs('nurse.*') ? 'active' : '' }}" href="{{ route('nurse.index') }}">

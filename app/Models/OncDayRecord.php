@@ -20,6 +20,8 @@ class OncDayRecord extends Model
         'or_dispatched_at',
         'or_dispatched_by',
         'or_send',
+        'or_administered_at',
+        'or_administered_by',
         'or_id',
         'or_medcode',
         'or_meddose',

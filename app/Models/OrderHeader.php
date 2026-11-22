@@ -29,6 +29,7 @@ class OrderHeader extends Model
         'or_reg_code',
         'or_cycle',
         'or_date',
+        'or_created_at',
         'or_prnflag',
         'or_chkflag',
         'or_prepflag',

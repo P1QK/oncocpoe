@@ -54,6 +54,14 @@
             </button>
         @endif
 
+        <a href="{{ route('reports.patients.profile', $order->or_hn) }}" class="btn btn-outline-info fw-semibold">
+            <i class="bi bi-person-vcard-fill me-1"></i> Profile ผู้ป่วย
+        </a>
+
+        <a href="{{ route('reports.visit', $order->or_id) }}" class="btn btn-outline-primary fw-semibold">
+            <i class="bi bi-clock-history me-1"></i> รายงานการรักษา &amp; เวลา
+        </a>
+
         <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> กลับหน้าหลักเภสัชกร
         </a>

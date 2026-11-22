@@ -386,6 +386,7 @@ class DoctorController extends Controller
                 'or_reg_code'       => $validated['or_reg_code'],
                 'or_cycle'          => (int) $validated['or_cycle'],
                 'or_date'           => $validated['or_date'],
+                'or_created_at'     => now(),
                 'or_prnflag'        => 1,
                 'or_chkflag'        => 0,
                 'or_prepflag'       => 0,
