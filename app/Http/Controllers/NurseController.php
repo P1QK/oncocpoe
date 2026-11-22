@@ -101,11 +101,16 @@ class NurseController extends Controller
 
         $wards = Ward::orderBy('wd_code')->get();
 
+        $activeBase = OncDayRecord::whereDate('or_daterec', $selectedDate)
+            ->where(fn ($q) => $q->whereNull('or_discont')->orWhere('or_discont', 0))
+            ->whereHas('orderHeader', fn ($q) => $q->where(fn ($s) => $s->whereNull('or_cancel')->orWhere('or_cancel', 0)));
+
         $stats = [
-            'patients_today'   => $patientsGroup->count(),
-            'today_doses'      => OncDayRecord::whereDate('or_daterec', $selectedDate)->count(),
-            'ready_to_admin'   => OncDayRecord::whereDate('or_daterec', $selectedDate)->where('or_prep', 1)->count(),
-            'delivered'        => OncDayRecord::whereDate('or_daterec', $selectedDate)->where('or_send', 1)->count(),
+            'patients_today' => $patientsGroup->count(),
+            'today_doses'    => (clone $activeBase)->count(),
+            'ready_to_send'  => (clone $activeBase)->where('or_prep', 1)->where('or_dispatch', 0)->where('or_send', 0)->count(),
+            'in_transit'     => (clone $activeBase)->where('or_dispatch', 1)->where('or_send', 0)->count(),
+            'delivered'      => (clone $activeBase)->where('or_send', 1)->count(),
         ];
 
         return view('nurse.index', compact(

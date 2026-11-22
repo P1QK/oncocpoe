@@ -435,18 +435,28 @@
                             วันที่ให้ยา: <span class="text-primary">{{ \Carbon\Carbon::parse($dateStr)->format('d/m/Y') }}</span>
                             <span class="badge bg-secondary ms-2">{{ $records->count() }} รายการยา</span>
                         </div>
-                        <div class="d-flex gap-2">
-                            <a href="{{ route('pharmacist.print.labels', ['orId' => $order->or_id, 'date' => $dateStr]) }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-tag-fill me-1"></i> พิมพ์ฉลากยาเฉพาะวันนี้
-                            </a>
-                            <form method="POST" action="{{ route('pharmacist.day-status', $order->or_id) }}" class="d-inline">
-                                @csrf
-                                <input type="hidden" name="or_daterec" value="{{ $dateStr }}">
-                                <input type="hidden" name="action" value="prep">
-                                <button type="submit" class="btn btn-sm btn-outline-success">
-                                    <i class="bi bi-check2-square me-1"></i> ยืนยันเตรียมยาวันนี้เสร็จสิ้น
-                                </button>
-                            </form>
+                        <div class="d-flex gap-2 flex-wrap">
+                            @if(!$isCancelled)
+                                <a href="{{ route('pharmacist.print.labels', ['orId' => $order->or_id, 'date' => $dateStr]) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-tag-fill me-1"></i> พิมพ์ฉลากยาเฉพาะวันนี้
+                                </a>
+                                <form method="POST" action="{{ route('pharmacist.day-status', $order->or_id) }}" class="d-inline">
+                                    @csrf
+                                    <input type="hidden" name="or_daterec" value="{{ $dateStr }}">
+                                    <input type="hidden" name="action" value="prep">
+                                    <button type="submit" class="btn btn-sm btn-info text-dark fw-semibold">
+                                        <i class="bi bi-box-seam-fill me-1"></i> เตรียมยาเสร็จ (รอส่ง)
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('pharmacist.day-status', $order->or_id) }}" class="d-inline">
+                                    @csrf
+                                    <input type="hidden" name="or_daterec" value="{{ $dateStr }}">
+                                    <input type="hidden" name="action" value="dispatch">
+                                    <button type="submit" class="btn btn-sm text-white fw-semibold" style="background-color: #7c3aed;">
+                                        <i class="bi bi-truck me-1"></i> กำลังส่งยาไปหอผู้ป่วย
+                                    </button>
+                                </form>
+                            @endif
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -497,9 +507,27 @@
                                         <td class="text-center"><span class="badge bg-light text-dark border">{{ $rec->or_text }}</span></td>
                                         <td class="text-center">
                                             @if($rec->or_send == 1)
-                                                <span class="badge bg-info text-dark">ส่งมอบ/บริหารยาแล้ว</span>
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle-fill me-1"></i>พยาบาลรับ/บริหารยาแล้ว
+                                                </span>
+                                            @elseif(($rec->or_dispatch ?? 0) == 1)
+                                                <span class="badge text-white" style="background-color: #7c3aed;">
+                                                    <i class="bi bi-truck me-1"></i>กำลังส่งยาไปหอผู้ป่วย
+                                                </span>
+                                                @if($rec->or_dispatched_at)
+                                                    <div class="small text-muted" style="font-size: 0.7rem;">
+                                                        {{ \Carbon\Carbon::parse($rec->or_dispatched_at)->format('H:i น.') }}
+                                                    </div>
+                                                @endif
                                             @elseif($rec->or_prep == 1)
-                                                <span class="badge bg-success">เตรียมยาแล้ว</span>
+                                                <span class="badge bg-info text-dark">
+                                                    <i class="bi bi-box-seam-fill me-1"></i>เตรียมยาแล้วรอส่ง
+                                                </span>
+                                                @if($rec->or_prepared_at)
+                                                    <div class="small text-muted" style="font-size: 0.7rem;">
+                                                        {{ \Carbon\Carbon::parse($rec->or_prepared_at)->format('H:i น.') }}
+                                                    </div>
+                                                @endif
                                             @else
                                                 <span class="badge bg-secondary">รับคำสั่งแล้ว (รอผสม)</span>
                                             @endif

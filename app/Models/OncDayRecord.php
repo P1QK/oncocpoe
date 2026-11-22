@@ -15,6 +15,10 @@ class OncDayRecord extends Model
     protected $fillable = [
         'or_check',
         'or_prep',
+        'or_dispatch',
+        'or_prepared_at',
+        'or_dispatched_at',
+        'or_dispatched_by',
         'or_send',
         'or_id',
         'or_medcode',

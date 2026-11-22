@@ -27,28 +27,34 @@
 
 <!-- สรุปสถิติประจำวันที่เลือก -->
 <div class="row g-3 mb-4">
-    <div class="col-md-3 col-6">
+    <div class="col-md col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-dark">
-            <div class="small text-secondary">ผู้ป่วยที่ได้รับยาในวันนี้ (ราย)</div>
+            <div class="small text-secondary">ผู้ป่วยวันนี้ (ราย)</div>
             <div class="fs-3 fw-bold text-dark">{{ $stats['patients_today'] }}</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-md col-6">
+        <div class="card card-medical bg-white p-3 border-start border-4 border-secondary">
+            <div class="small text-secondary">รายการยารวม (โดส)</div>
+            <div class="fs-3 fw-bold text-secondary">{{ $stats['today_doses'] }}</div>
+        </div>
+    </div>
+    <div class="col-md col-6">
         <div class="card card-medical bg-white p-3 border-start border-4 border-info">
-            <div class="small text-secondary">รายการยารวมในวันนี้ (ขวด/โดส)</div>
-            <div class="fs-3 fw-bold text-info">{{ $stats['today_doses'] }}</div>
+            <div class="small text-secondary">เตรียมยาแล้วรอส่ง</div>
+            <div class="fs-3 fw-bold text-info">{{ $stats['ready_to_send'] }}</div>
         </div>
     </div>
-    <div class="col-md-3 col-6">
+    <div class="col-md col-6">
+        <div class="card card-medical bg-white p-3 border-start border-4" style="border-left-color: #7c3aed !important;">
+            <div class="small text-secondary">กำลังส่งยาไปหอฯ</div>
+            <div class="fs-3 fw-bold" style="color: #7c3aed;">{{ $stats['in_transit'] }}</div>
+        </div>
+    </div>
+    <div class="col-md col-12">
         <div class="card card-medical bg-white p-3 border-start border-4 border-success">
-            <div class="small text-secondary">เภสัชกรเตรียมยาพร้อมแล้ว</div>
-            <div class="fs-3 fw-bold text-success">{{ $stats['ready_to_admin'] }}</div>
-        </div>
-    </div>
-    <div class="col-md-3 col-6">
-        <div class="card card-medical bg-white p-3 border-start border-4 border-primary">
-            <div class="small text-secondary">บริหารยา/รับยาแล้ว</div>
-            <div class="fs-3 fw-bold text-primary">{{ $stats['delivered'] }}</div>
+            <div class="small text-secondary">รับยา/บริหารยาแล้ว</div>
+            <div class="fs-3 fw-bold text-success">{{ $stats['delivered'] }}</div>
         </div>
     </div>
 </div>
@@ -270,10 +276,28 @@
                                 <td class="text-center">
                                     @if($rec->or_send == 1)
                                         <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>บริหารยาแล้ว</span>
+                                    @elseif(($rec->or_dispatch ?? 0) == 1)
+                                        <span class="badge text-white" style="background-color: #7c3aed;">
+                                            <i class="bi bi-truck me-1"></i>กำลังส่งยาไปหอผู้ป่วย
+                                        </span>
+                                        @if($rec->or_dispatched_at)
+                                            <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                                                ส่งออก {{ \Carbon\Carbon::parse($rec->or_dispatched_at)->format('H:i น.') }}
+                                            </div>
+                                        @endif
                                     @elseif($rec->or_prep == 1)
-                                        <span class="badge bg-info text-dark">เตรียมยาพร้อมใช้</span>
+                                        <span class="badge bg-info text-dark">
+                                            <i class="bi bi-box-seam-fill me-1"></i>เตรียมยาแล้วรอส่ง
+                                        </span>
+                                        @if($rec->or_prepared_at)
+                                            <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                                                เสร็จ {{ \Carbon\Carbon::parse($rec->or_prepared_at)->format('H:i น.') }}
+                                            </div>
+                                        @endif
                                     @else
-                                        <span class="badge bg-warning text-dark">กำลังเตรียมยา</span>
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-hourglass-split me-1"></i>กำลังเตรียมยา
+                                        </span>
                                     @endif
                                 </td>
                                 <td class="text-end pe-4">

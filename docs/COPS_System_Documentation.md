@@ -3,7 +3,7 @@
 > **ชื่อระบบ:** COPS™ Oncology — ระบบบริหารจัดการคำสั่งใช้ยา การเตรียมยา และการบริหารยาเคมีบำบัดชนิดฉีด  
 > **หน่วยงาน:** Sterile Products Pharmacy Service, SPR Hospital  
 > **เทคโนโลยีหลัก:** Laravel 12 (PHP 8.3.30 / MAMP), MySQL (`oncospr`), Bootstrap 5, JavaScript (ES6 / Fetch AJAX), JsBarcode  
-> **อัปเดตล่าสุด:** 22 พฤศจิกายน 2026 (Version 2.2)
+> **อัปเดตล่าสุด:** 22 พฤศจิกายน 2026 (Version 2.3)
 
 ---
 
@@ -125,6 +125,7 @@ erDiagram
 | **v2.0** | 22 พ.ย. 2026 | Multi-Drug Admixture & Unlimited Additives | 1) สร้างตาราง `chemo_additives` (8 สารผสมมาตรฐาน เช่น `7.5% NaHCO3`, `20% Mannitol`, `KCl`, `MgSO4`, `Hydrocortisone`, `MESNA`, `CaGluconate`, `Heparin` + รองรับพิมพ์ชื่อสารผสมอิสระได้ไม่จำกัด)<br>2) เพิ่มคอลัมน์ `rd_bag_group`/`rd_additives` (`reg_d`) และ `or_bag_group`/`or_additives` (`order_d`, `onc_dayrecord`) + เพิ่มยา `VINC` (Vincristine) และ `ETOP` (Etoposide) ใน `medcyto`<br>3) อัปเกรดฟอร์มแพทย์ (`doctor/create.blade.php`) ให้เลือก **กลุ่มถุงรวม (`BAG-A` ถึง `BAG-D`)** เพื่อผสมยาเคมีบำบัดหลายชนิดลงในขวดเดียวกัน (เช่น DA-EPOCH) พร้อมซิงก์สารน้ำ/ปริมาตร/วิถีทาง/เวลาอัตโนมัติ และปุ่ม **`+ ผสมสารอื่นในขวดนี้`** แบบไม่จำกัดจำนวน<br>4) รวมยาในถุงเดียวกันพิมพ์เป็น **1 สติกเกอร์ขนาด 9×7 cm** (`daily-stickers`, `print-labels`), ผสานเซลล์สารน้ำเป็น **1 ถุงรวมพร้อมแถบเตือน** ใน **ใบจัดยา Working Formula (A5 แนวนอน)** (`print-working-formula`), แสดงแบบข้อความต่อเนื่องในใบสั่งยา A4 (`print-order`) รวมถึงหน้าแพทย์ เภสัชกร และพยาบาลครบวงจร |
 | **v2.1** | 22 พ.ย. 2026 | Pharmacist Chemotherapy Order Edit & A4 Print | 1) เพิ่มหน้า **แก้ไขคำสั่งใช้ยาเคมีบำบัดสำหรับเภสัชกร (หลังปรึกษาแพทย์)** (`GET /pharmacist/order/{orId}/edit`, `PUT /pharmacist/order/{orId}`, `pharmacist/edit.blade.php`) รองรับแก้ไขเฉพาะรายการยาเคมีบำบัด (`order_d`: เปลี่ยนยา/เพิ่ม/ลบ, ขนาดยา, % ลดขนาด, ถุงรวม `BAG-A`–`D`, สารน้ำ, สารผสมในขวด, วิถีทาง/เวลา, ช่วงวันที่) พร้อมคำนวณ `Working mL`/`Total Vol` อัตโนมัติ, บันทึก **Intervention Note** การปรึกษาแพทย์ และแตก `onc_dayrecord` ใหม่อัตโนมัติโดยไม่กระทบ Pre-med/Hydration/Post-med/Home-med<br>2) เพิ่มปุ่ม **พิมพ์ใบสั่งยา (A4)** ในหน้าเภสัชกร (`GET /pharmacist/order/{orId}/print/order-sheet`) ใช้รูปแบบมาตรฐานเดียวกันกับใบสั่งยาแพทย์หลังแก้ไขคำสั่งเรียบร้อยแล้ว |
 | **v2.2** | 22 พ.ย. 2026 | Order Cancellation & 9×7 cm Sticker Page Size | 1) เพิ่มฟิลด์ `or_cancel`, `or_cancel_reason`, `or_cancelled_by`, `or_cancelled_at` ใน `order_h` และระบบ **ยกเลิกคำสั่งใช้ยา (ไม่ลบข้อมูล)** สำหรับทั้ง **แพทย์** และ **เภสัชกร** พร้อม Modal ระบุเหตุผล, เปลี่ยนสถานะ `or_discont = 1` ใน `order_d`/`onc_dayrecord`, ซ่อนรายการที่ถูกยกเลิกจากหน้าพยาบาลและสติกเกอร์รายวันโดยอัตโนมัติ และเพิ่มตัวกรองสถานะ `ยกเลิกแล้ว` ในหน้ารายการแพทย์และเภสัชกร<br>2) ตั้งค่าหน้ากระดาษพิมพ์สติกเกอร์ (`@page { size: 9cm 7cm; margin: 0; }`) แบบ **1 ดวงต่อ 1 หน้า** สำหรับเครื่องพิมพ์สติกเกอร์ความร้อนใน `daily-stickers.blade.php` และ `print-labels.blade.php` |
+| **v2.3** | 22 พ.ย. 2026 | Pharmacy-to-Nurse Handoff Status (4-Stage Pipeline) | เพิ่มฟิลด์ `or_dispatch`, `or_prepared_at`, `or_dispatched_at`, `or_dispatched_by` ใน `onc_dayrecord` แยกสถานะการส่งต่อยาระหว่างเภสัชกรและพยาบาลชัดเจนครบ 4 ขั้นตอน: **กำลังเตรียมยา → เตรียมยาแล้วรอส่ง → กำลังส่งยาไปหอผู้ป่วย (พร้อมเวลาส่ง) → พยาบาลรับ/บริหารยาแล้ว** พร้อมปุ่มกดอัปเดตในหน้าเภสัชกรและการ์ดสถิติ 5 ช่องในหน้าพยาบาล |
 
 ---
 

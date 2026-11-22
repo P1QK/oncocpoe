@@ -558,13 +558,30 @@ class PharmacistController extends Controller
         }
 
         if ($action === 'prep') {
-            $query->update(['or_prep' => 1]);
+            $query->update([
+                'or_prep'        => 1,
+                'or_prepared_at' => now(),
+            ]);
             OrderHeader::where('or_id', $orId)->update(['or_prepflag' => 1]);
-            $msg = 'บันทึกสถานะ "เตรียมยาเสร็จสิ้น" เรียบร้อยแล้ว';
+            $msg = 'อัปเดตสถานะเป็น "เตรียมยาแล้วรอส่ง" เรียบร้อยแล้ว';
+        } elseif ($action === 'dispatch') {
+            $query->update([
+                'or_prep'          => 1,
+                'or_dispatch'      => 1,
+                'or_prepared_at'   => DB::raw('COALESCE(or_prepared_at, NOW())'),
+                'or_dispatched_at' => now(),
+                'or_dispatched_by' => Auth::user()->name,
+            ]);
+            OrderHeader::where('or_id', $orId)->update(['or_prepflag' => 1]);
+            $msg = 'อัปเดตสถานะเป็น "กำลังส่งยาไปยังหอผู้ป่วย" เรียบร้อยแล้ว';
         } elseif ($action === 'send') {
-            $query->update(['or_prep' => 1, 'or_send' => 1]);
+            $query->update([
+                'or_prep'     => 1,
+                'or_dispatch' => 1,
+                'or_send'     => 1,
+            ]);
             OrderHeader::where('or_id', $orId)->update(['or_prepflag' => 1, 'or_sendflag' => 1]);
-            $msg = 'บันทึกสถานะ "ส่งมอบยาไปยังหอผู้ป่วย" เรียบร้อยแล้ว';
+            $msg = 'บันทึกสถานะ "ส่งมอบ/บริหารยาแล้ว" เรียบร้อยแล้ว';
         } else {
             $msg = 'อัปเดตสถานะเรียบร้อยแล้ว';
         }
