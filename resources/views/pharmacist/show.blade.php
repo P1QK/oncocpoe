@@ -31,6 +31,10 @@
             </form>
         @endif
 
+        <a href="{{ route('pharmacist.edit', $order->or_id) }}" class="btn btn-warning text-dark fw-bold shadow-sm">
+            <i class="bi bi-pencil-square me-1"></i> แก้ไขคำสั่งยาเคมีบำบัด
+        </a>
+
         <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold">
             <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบจัดยา Working Formula (A5 แนวนอน)
         </a>
@@ -237,7 +241,14 @@
                                        value="{{ $d->or_orderno ?: ($idx + 1) }}" required>
                             </td>
                             <td>
-                                <div class="fw-bold text-primary">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
+                                <div class="fw-bold text-primary">
+                                    [{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}
+                                    @if($d->or_bag_group)
+                                        <span class="badge text-white ms-1" style="background-color: #7c3aed;">
+                                            <i class="bi bi-layers-fill me-1"></i>ผสมรวม {{ $d->or_bag_group }}
+                                        </span>
+                                    @endif
+                                </div>
                                 <small class="text-secondary">
                                     ความเข้มข้น: <strong>{{ number_format(optional($d->medication)->dg_conc ?? 1, 2) }} mg/mL</strong>
                                     @if(($d->or_reduce_pct ?? 0) > 0)
@@ -254,6 +265,17 @@
                             <td>
                                 {{ optional($d->solution)->so_name ?? $d->or_soln }}
                                 <strong>{{ number_format($d->or_solvol, 0) }} mL</strong>
+                                @if(!empty($d->or_additives) && is_array($d->or_additives))
+                                    <div class="mt-1 d-flex flex-wrap gap-1">
+                                        @foreach($d->or_additives as $ad)
+                                            <span class="badge bg-info-subtle text-dark border border-info-subtle" style="font-size: 0.72rem;">
+                                                + {{ $ad['name'] ?? '' }}
+                                                @if(!empty($ad['dose'])) {{ $ad['dose'] }} {{ $ad['unit'] ?? '' }}@endif
+                                                @if(!empty($ad['vol_ml']) && (float)$ad['vol_ml'] > 0) ({{ $ad['vol_ml'] }} mL)@endif
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </td>
                             <td class="text-end fw-semibold">
                                 {{ number_format($d->or_totalvol, 2) }} mL
@@ -417,12 +439,24 @@
                                         <td>{{ \Carbon\Carbon::parse($rec->or_daterec)->format('d/m/Y') }}</td>
                                         <td class="fw-semibold text-primary">
                                             [{{ $rec->or_medcode }}] {{ optional($rec->medication)->dg_name ?? $rec->or_medcode }}
+                                            @if($rec->or_bag_group)
+                                                <span class="badge text-white ms-1" style="background-color: #7c3aed; font-size: 0.7rem;">{{ $rec->or_bag_group }}</span>
+                                            @endif
                                         </td>
                                         <td class="text-end fw-bold text-danger">{{ number_format($rec->or_meddose, 2) }} mg</td>
                                         <td class="text-end fw-bold">{{ number_format($rec->or_working, 2) }} mL</td>
                                         <td>
                                             {{ optional($rec->solution)->so_name ?? $rec->or_soln }} ({{ number_format($rec->or_solvol, 0) }} mL)
                                             <small class="text-muted">รวม {{ number_format($rec->or_totalvol, 2) }} mL</small>
+                                            @if(!empty($rec->or_additives) && is_array($rec->or_additives))
+                                                <div class="mt-1 d-flex flex-wrap gap-1">
+                                                    @foreach($rec->or_additives as $ad)
+                                                        <span class="badge bg-info-subtle text-dark border border-info-subtle" style="font-size: 0.68rem;">
+                                                            + {{ $ad['name'] ?? '' }} {{ !empty($ad['dose']) ? ($ad['dose'] . ' ' . ($ad['unit'] ?? '')) : '' }}
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </td>
                                         <td>
                                             {{ optional($rec->route)->rt_name ?? $rec->or_medroute }} /

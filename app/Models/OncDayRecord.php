@@ -23,8 +23,10 @@ class OncDayRecord extends Model
         'or_soln',
         'or_medroute',
         'or_solvol',
+        'or_additives',
         'or_medtime',
         'or_orderno',
+        'or_bag_group',
         'or_daterec',
         'or_start',
         'or_stop',
@@ -38,6 +40,13 @@ class OncDayRecord extends Model
         'or_holdstop',
         'or_discont',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'or_additives' => 'array',
+        ];
+    }
 
     public function orderHeader(): BelongsTo
     {

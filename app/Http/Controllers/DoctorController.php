@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChemoAdditive;
 use App\Models\Medcyto;
 use App\Models\OrderDetail;
 use App\Models\OrderHeader;
@@ -74,6 +75,7 @@ class DoctorController extends Controller
         $routes    = Route::orderBy('rt_code')->get();
         $timings   = Timing::orderBy('tm_code')->get();
         $units     = Unit::orderBy('un_code')->get();
+        $additives = ChemoAdditive::where('is_active', true)->orderBy('sort_order')->get();
 
         $preMedAntiemetics = SupportiveMed::where('category', 'pre_med_antiemetic')
             ->where('is_active', true)
@@ -118,6 +120,8 @@ class DoctorController extends Controller
                 'items'    => $reg->details->values()->map(function ($d, $idx) {
                     return [
                         'rd_orderno'    => (int) ($d->rd_orderno ?: ($idx + 1)),
+                        'rd_bag_group'  => $d->rd_bag_group ?: '',
+                        'rd_additives'  => is_array($d->rd_additives) ? $d->rd_additives : [],
                         'rd_medcode'    => $d->rd_medcode,
                         'dg_name'       => optional($d->medication)->dg_name ?? $d->rd_medcode,
                         'dg_conc'       => (float) (optional($d->medication)->dg_conc ?? 1),
@@ -148,6 +152,7 @@ class DoctorController extends Controller
             'routes',
             'timings',
             'units',
+            'additives',
             'preMedAntiemetics',
             'preMedHypersensitivity',
             'preHydrations',
@@ -275,9 +280,11 @@ class DoctorController extends Controller
             'or_reg_code'       => ['required', 'string', 'max:30'],
             'or_adjust_percent' => ['nullable', 'numeric', 'min:0', 'max:90'],
             'or_adjust_reason'  => ['nullable', 'string', 'max:1000'],
-            'items'             => ['required', 'array', 'min:1'],
-            'items.*.orderno'   => ['nullable', 'integer', 'min:1', 'max:99'],
-            'items.*.medcode'   => ['required', 'string', 'max:8'],
+            'items'                  => ['required', 'array', 'min:1'],
+            'items.*.orderno'        => ['nullable', 'integer', 'min:1', 'max:99'],
+            'items.*.bag_group'      => ['nullable', 'string', 'max:20'],
+            'items.*.additives_json' => ['nullable', 'string'],
+            'items.*.medcode'        => ['required', 'string', 'max:8'],
             'items.*.std_dose'  => ['required', 'numeric', 'min:0'],
             'items.*.reduce_pct'=> ['nullable', 'numeric', 'min:0', 'max:90'],
             'items.*.meddose'   => ['required', 'numeric', 'min:0.01'],
@@ -363,7 +370,31 @@ class DoctorController extends Controller
                 $finalDose = round((float) $item['meddose'], 2);
                 $solVol    = round((float) $item['solvol'], 2);
                 $workingVol = round($finalDose / $conc, 2);
-                $totalVol   = round($solVol + $workingVol, 2);
+
+                // Parse additives (สารเติมแต่งที่ผสมลงในขวดเดียวกัน เช่น 7.5% NaHCO3, Mannitol, KCl)
+                $parsedAdditives = [];
+                $additiveVol = 0.0;
+                if (!empty($item['additives_json'])) {
+                    $decoded = json_decode($item['additives_json'], true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $ad) {
+                            $adName = trim((string) ($ad['name'] ?? ''));
+                            if ($adName === '') continue;
+                            $adVol = max(0, (float) ($ad['vol_ml'] ?? 0));
+                            $additiveVol += $adVol;
+                            $parsedAdditives[] = [
+                                'code'   => trim((string) ($ad['code'] ?? 'CUSTOM')),
+                                'name'   => $adName,
+                                'dose'   => trim((string) ($ad['dose'] ?? '')),
+                                'unit'   => trim((string) ($ad['unit'] ?? '')),
+                                'vol_ml' => round($adVol, 2),
+                            ];
+                        }
+                    }
+                }
+
+                $bagGroup = trim((string) ($item['bag_group'] ?? '')) ?: null;
+                $totalVol = round($solVol + $workingVol + $additiveVol, 2);
 
                 $startDayOffset = max(0, ((int) $item['start_day']) - 1);
                 $durationDays   = max(1, (int) $item['duration']);
@@ -395,10 +426,12 @@ class DoctorController extends Controller
                     'or_soln'       => $item['soln'],
                     'or_medroute'   => substr($item['medroute'], 0, 2),
                     'or_solvol'     => $solVol,
+                    'or_additives'  => !empty($parsedAdditives) ? $parsedAdditives : null,
                     'or_medtime'    => $item['medtime'],
                     'or_hold'       => 0,
                     'or_discont'    => 0,
                     'or_orderno'    => (int) ($item['orderno'] ?? ($idx + 1)),
+                    'or_bag_group'  => $bagGroup,
                     'or_start'      => $orStart->format('Y-m-d'),
                     'or_stop'       => $orStop->format('Y-m-d'),
                     'or_duration'   => $durationDays,
@@ -451,5 +484,23 @@ class DoctorController extends Controller
         ])->findOrFail($orId);
 
         return view('doctor.show', compact('order'));
+    }
+
+    /**
+     * พิมพ์ใบสั่งใช้ยาเคมีบำบัดเต็มรูปแบบ (A4) เรียงตามลำดับการให้ยา
+     */
+    public function printOrder(string $orId)
+    {
+        $order = OrderHeader::with([
+            'details.medication',
+            'details.unit',
+            'details.solution',
+            'details.route',
+            'details.timing',
+            'supportiveMeds',
+            'ward',
+        ])->findOrFail($orId);
+
+        return view('doctor.print-order', compact('order'));
     }
 }

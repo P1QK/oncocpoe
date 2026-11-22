@@ -165,9 +165,14 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <a href="{{ route('doctor.show', $order->or_id) }}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-eye-fill me-1"></i> ดูใบสั่งยา
-                            </a>
+                            <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-sm btn-dark fw-semibold" title="พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)">
+                                    <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยา
+                                </a>
+                                <a href="{{ route('doctor.show', $order->or_id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye-fill me-1"></i> ดูใบสั่งยา
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 @empty

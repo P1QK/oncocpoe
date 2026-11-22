@@ -226,6 +226,11 @@
                                 <td>
                                     <div class="fw-bold text-danger">
                                         [{{ $rec->or_medcode }}] {{ optional($rec->medication)->dg_name ?? $rec->or_medcode }}
+                                        @if($rec->or_bag_group)
+                                            <span class="badge text-white ms-1" style="background-color: #7c3aed; font-size: 0.72rem;">
+                                                <i class="bi bi-layers-fill me-1"></i>ผสมรวม {{ $rec->or_bag_group }}
+                                            </span>
+                                        @endif
                                     </div>
                                     <span class="badge bg-danger-subtle text-danger fs-6 mt-1">
                                         {{ number_format($rec->or_meddose, 2) }} {{ optional($rec->unit)->un_unit ?? 'mg' }}
@@ -237,6 +242,17 @@
                                         ดูดยา: {{ number_format($rec->or_working, 2) }} mL |
                                         ปริมาตรรวม: <strong>{{ number_format($rec->or_totalvol, 2) }} mL</strong>
                                     </small>
+                                    @if(!empty($rec->or_additives) && is_array($rec->or_additives))
+                                        <div class="mt-1 d-flex flex-wrap gap-1">
+                                            @foreach($rec->or_additives as $ad)
+                                                <span class="badge bg-info-subtle text-dark border border-info-subtle" style="font-size: 0.72rem;">
+                                                    + {{ $ad['name'] ?? '' }}
+                                                    @if(!empty($ad['dose'])) {{ $ad['dose'] }} {{ $ad['unit'] ?? '' }}@endif
+                                                    @if(!empty($ad['vol_ml']) && (float)$ad['vol_ml'] > 0) ({{ $ad['vol_ml'] }} mL)@endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </td>
                                 <td>
                                     <div class="fw-semibold">{{ optional($rec->route)->rt_name ?? $rec->or_medroute }}</div>

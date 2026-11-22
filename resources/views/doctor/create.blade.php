@@ -793,12 +793,29 @@
     const SOLUTIONS_LIST = @json($solutions);
     const ROUTES_LIST = @json($routes);
     const TIMINGS_LIST = @json($timings);
+    const ADDITIVES_LIST = @json($additives);
+
+    const BAG_GROUP_META = {
+        'BAG-A': { label: 'ถุงรวม A', color: '#7c3aed', bg: '#f5f3ff' },
+        'BAG-B': { label: 'ถุงรวม B', color: '#0d9488', bg: '#f0fdfa' },
+        'BAG-C': { label: 'ถุงรวม C', color: '#ea580c', bg: '#fff7ed' },
+        'BAG-D': { label: 'ถุงรวม D', color: '#db2777', bg: '#fdf2f8' },
+    };
 
     let currentItems = [];
+
+    function escapeHtmlAttr(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
 
     function syncInputsToState() {
         currentItems.forEach((item, idx) => {
             const ordEl = document.getElementById(`orderno_${idx}`);
+            const bagEl = document.getElementById(`bag_group_${idx}`);
             const solEl = document.querySelector(`[name="items[${idx}][soln]"]`);
             const volEl = document.getElementById(`solvol_${idx}`);
             const rtEl  = document.querySelector(`[name="items[${idx}][medroute]"]`);
@@ -808,6 +825,7 @@
             const redEl = document.getElementById(`reduce_pct_${idx}`);
 
             if (ordEl) item.orderno = parseInt(ordEl.value) || (idx + 1);
+            if (bagEl) item.bag_group = bagEl.value || '';
             if (solEl) item.soln = solEl.value;
             if (volEl) item.solvol = parseFloat(volEl.value) || 0;
             if (rtEl)  item.medroute = rtEl.value;
@@ -815,6 +833,7 @@
             if (sdEl)  item.start_day = parseInt(sdEl.value) || 1;
             if (durEl) item.duration = parseInt(durEl.value) || 1;
             if (redEl) item.reduce_pct = parseFloat(redEl.value) || 0;
+            if (!Array.isArray(item.additives)) item.additives = [];
         });
     }
 
@@ -881,6 +900,8 @@
 
         currentItems = reg.items.map((item, idx) => ({
             orderno: item.rd_orderno || (idx + 1),
+            bag_group: item.rd_bag_group || '',
+            additives: Array.isArray(item.rd_additives) ? JSON.parse(JSON.stringify(item.rd_additives)) : [],
             medcode: item.rd_medcode,
             dg_name: item.dg_name,
             dg_conc: item.dg_conc,
@@ -919,6 +940,8 @@
 
         currentItems.push({
             orderno: currentItems.length + 1,
+            bag_group: '',
+            additives: [],
             medcode: defaultMed.dg_code,
             dg_name: defaultMed.dg_name,
             dg_conc: parseFloat(defaultMed.dg_conc) || 1,
@@ -942,6 +965,105 @@
         renderMedTable();
         recalculateAllRows();
         checkPatientCycleHistory(false);
+    }
+
+    function onBagGroupChange(idx, group) {
+        syncInputsToState();
+        if (!currentItems[idx]) return;
+        currentItems[idx].bag_group = group || '';
+
+        // หากเลือกกลุ่มถุงรวมที่มีตัวยาอื่นอยู่ก่อนหน้า ให้คัดลอกสารน้ำ/ปริมาตร/Route/Timing จากตัวยาแรกในถุงเดียวกันโดยอัตโนมัติ
+        if (group) {
+            const peer = currentItems.find((it, i) => i !== idx && !it.is_off && it.bag_group === group);
+            if (peer) {
+                currentItems[idx].soln = peer.soln;
+                currentItems[idx].solvol = peer.solvol;
+                currentItems[idx].medroute = peer.medroute;
+                currentItems[idx].medtime = peer.medtime;
+            }
+        }
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function onBagSharedFieldChange(idx, field, val) {
+        if (!currentItems[idx]) return;
+        currentItems[idx][field] = (field === 'solvol') ? (parseFloat(val) || 0) : val;
+        const group = currentItems[idx].bag_group;
+        if (!group) return;
+
+        // ซิงก์ค่าสารน้ำ/ปริมาตร/วิถีทาง/เวลา ให้ตรงกันทุกตัวที่อยู่ในถุงรวมเดียวกัน
+        currentItems.forEach((it, i) => {
+            if (i !== idx && !it.is_off && it.bag_group === group) {
+                it[field] = currentItems[idx][field];
+                if (field === 'soln') {
+                    const el = document.querySelector(`[name="items[${i}][soln]"]`);
+                    if (el) el.value = val;
+                } else if (field === 'solvol') {
+                    const el = document.getElementById(`solvol_${i}`);
+                    if (el) el.value = val;
+                } else if (field === 'medroute') {
+                    const el = document.querySelector(`[name="items[${i}][medroute]"]`);
+                    if (el) el.value = val;
+                } else if (field === 'medtime') {
+                    const el = document.querySelector(`[name="items[${i}][medtime]"]`);
+                    if (el) el.value = val;
+                }
+            }
+        });
+    }
+
+    function addAdditiveToItem(idx) {
+        syncInputsToState();
+        if (!currentItems[idx]) return;
+        if (!Array.isArray(currentItems[idx].additives)) currentItems[idx].additives = [];
+        const firstAd = ADDITIVES_LIST.length > 0 ? ADDITIVES_LIST[0] : { ad_code: 'CUSTOM', ad_name: '', default_dose: '', default_unit: '', default_vol_ml: 0 };
+        currentItems[idx].additives.push({
+            code: firstAd.ad_code,
+            name: firstAd.ad_name,
+            dose: firstAd.default_dose || '',
+            unit: firstAd.default_unit || '',
+            vol_ml: parseFloat(firstAd.default_vol_ml) || 0,
+        });
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function onAdditivePresetChange(idx, adIdx, code) {
+        if (!currentItems[idx] || !currentItems[idx].additives || !currentItems[idx].additives[adIdx]) return;
+        if (code === 'CUSTOM') {
+            currentItems[idx].additives[adIdx] = { code: 'CUSTOM', name: '', dose: '', unit: 'mEq', vol_ml: 0 };
+        } else {
+            const found = ADDITIVES_LIST.find(a => a.ad_code === code);
+            if (found) {
+                currentItems[idx].additives[adIdx] = {
+                    code: found.ad_code,
+                    name: found.ad_name,
+                    dose: found.default_dose || '',
+                    unit: found.default_unit || '',
+                    vol_ml: parseFloat(found.default_vol_ml) || 0,
+                };
+            }
+        }
+        renderMedTable();
+        recalculateAllRows();
+    }
+
+    function onAdditiveFieldChange(idx, adIdx, field, val) {
+        if (!currentItems[idx] || !currentItems[idx].additives || !currentItems[idx].additives[adIdx]) return;
+        currentItems[idx].additives[adIdx][field] = (field === 'vol_ml') ? (parseFloat(val) || 0) : val;
+        const hiddenEl = document.getElementById(`additives_json_${idx}`);
+        if (hiddenEl) {
+            hiddenEl.value = JSON.stringify(currentItems[idx].additives);
+        }
+    }
+
+    function removeAdditiveFromItem(idx, adIdx) {
+        syncInputsToState();
+        if (!currentItems[idx] || !currentItems[idx].additives) return;
+        currentItems[idx].additives.splice(adIdx, 1);
+        renderMedTable();
+        recalculateAllRows();
     }
 
     function toggleItemOff(idx) {
@@ -1000,11 +1122,21 @@
             return;
         }
 
+        // นับจำนวนตัวยาที่เปิดสั่งในแต่ละ Bag Group เพื่อแสดงสถานะถุงรวม
+        const bagCounts = {};
+        currentItems.forEach(it => {
+            if (!it.is_off && it.bag_group) {
+                bagCounts[it.bag_group] = (bagCounts[it.bag_group] || 0) + 1;
+            }
+        });
+
         let html = '';
         currentItems.forEach((item, idx) => {
             const isOff = !!item.is_off;
             const disabledAttr = isOff ? 'disabled' : '';
+            const bagMeta = (!isOff && item.bag_group && BAG_GROUP_META[item.bag_group]) ? BAG_GROUP_META[item.bag_group] : null;
             const rowClass = isOff ? 'table-secondary opacity-50' : '';
+            const rowStyle = bagMeta ? `border-left: 5px solid ${bagMeta.color}; background-color: ${bagMeta.bg};` : '';
 
             const solOptions = SOLUTIONS_LIST.map(s =>
                 `<option value="${s.so_code}" ${s.so_code === item.soln ? 'selected' : ''}>${s.so_code} - ${s.so_name}</option>`
@@ -1024,6 +1156,60 @@
                 { code: '04', label: 'AUC (Calvert)' },
             ].map(u => `<option value="${u.code}" ${u.code === item.medunit ? 'selected' : ''}>${u.label}</option>`).join('');
 
+            const bagGroupOptions = [
+                { code: '', label: 'แยกขวดเดี่ยว' },
+                { code: 'BAG-A', label: 'ผสมรวมถุง A' },
+                { code: 'BAG-B', label: 'ผสมรวมถุง B' },
+                { code: 'BAG-C', label: 'ผสมรวมถุง C' },
+                { code: 'BAG-D', label: 'ผสมรวมถุง D' },
+            ].map(bg => `<option value="${bg.code}" ${bg.code === (item.bag_group || '') ? 'selected' : ''}>${bg.label}</option>`).join('');
+
+            const bagBadgeHtml = bagMeta
+                ? `<div class="mt-1"><span class="badge text-white" style="background-color: ${bagMeta.color}; font-size: 0.7rem;"><i class="bi bi-layers-fill me-1"></i>${bagMeta.label} (${bagCounts[item.bag_group] || 1} ตัวยา)</span></div>`
+                : '';
+
+            // ส่วนแสดงสารผสมเพิ่มเติมในขวดเดียวกัน (Additives)
+            const additivesArr = Array.isArray(item.additives) ? item.additives : [];
+            const additivesRowsHtml = additivesArr.map((ad, adIdx) => {
+                const isCustomAd = ad.code === 'CUSTOM';
+                const presetOpts = ADDITIVES_LIST.map(a =>
+                    `<option value="${a.ad_code}" ${a.ad_code === ad.code ? 'selected' : ''}>${a.ad_name}</option>`
+                ).join('') + `<option value="CUSTOM" ${isCustomAd ? 'selected' : ''}>อื่นๆ (พิมพ์ชื่อเอง)...</option>`;
+
+                return `
+                    <div class="border rounded-2 p-1 bg-white mt-1 shadow-sm" style="font-size: 0.72rem;">
+                        <div class="d-flex gap-1 align-items-center mb-1">
+                            <span class="badge bg-info text-dark px-1">+สาร</span>
+                            <select class="form-select form-select-sm py-0 px-1" style="font-size: 0.72rem;"
+                                onchange="onAdditivePresetChange(${idx}, ${adIdx}, this.value)" ${disabledAttr}>
+                                ${presetOpts}
+                            </select>
+                            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1" style="font-size: 0.68rem;"
+                                onclick="removeAdditiveFromItem(${idx}, ${adIdx})" title="ลบสารผสมนี้" ${disabledAttr}>&times;</button>
+                        </div>
+                        ${isCustomAd ? `
+                            <input type="text" class="form-control form-control-sm py-0 px-1 mb-1" style="font-size: 0.72rem;"
+                                placeholder="ระบุชื่อสารผสม เช่น 10% CaGluconate..."
+                                value="${escapeHtmlAttr(ad.name)}"
+                                oninput="onAdditiveFieldChange(${idx}, ${adIdx}, 'name', this.value)" ${disabledAttr}>
+                        ` : ''}
+                        <div class="d-flex gap-1">
+                            <input type="text" class="form-control form-control-sm py-0 px-1 text-end" style="font-size: 0.72rem; width: 42%;"
+                                placeholder="ขนาด" value="${escapeHtmlAttr(ad.dose)}"
+                                oninput="onAdditiveFieldChange(${idx}, ${adIdx}, 'dose', this.value)" ${disabledAttr}>
+                            <input type="text" class="form-control form-control-sm py-0 px-1" style="font-size: 0.72rem; width: 28%;"
+                                placeholder="หน่วย" value="${escapeHtmlAttr(ad.unit)}"
+                                oninput="onAdditiveFieldChange(${idx}, ${adIdx}, 'unit', this.value)" ${disabledAttr}>
+                            <div class="input-group input-group-sm" style="width: 30%;">
+                                <input type="number" step="0.5" min="0" class="form-control form-control-sm py-0 px-1 text-end" style="font-size: 0.7rem;"
+                                    placeholder="mL" title="ปริมาตรสารผสม (mL)" value="${ad.vol_ml || 0}"
+                                    oninput="onAdditiveFieldChange(${idx}, ${adIdx}, 'vol_ml', this.value)" ${disabledAttr}>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
             // ส่วนแสดงชื่อยา (หากเป็นรายการสั่งอิสระ ให้เลือกยาจาก Dropdown ได้ทันที)
             let medCellHtml = '';
             if (item.is_custom) {
@@ -1036,6 +1222,7 @@
                         ${medOptions}
                     </select>
                     <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL <span class="badge bg-info-subtle text-dark border ms-1">สั่งอิสระ</span></small>
+                    ${bagBadgeHtml}
                 `;
             } else {
                 medCellHtml = `
@@ -1044,18 +1231,26 @@
                         ${isOff ? '<span class="badge bg-danger ms-1">OFF (งดสั่ง)</span>' : ''}
                     </div>
                     <small class="text-muted">ความเข้มข้น: ${item.dg_conc} mg/mL</small>
+                    ${bagBadgeHtml}
                     <input type="hidden" name="items[${idx}][medcode]" value="${item.medcode}" ${disabledAttr}>
                 `;
             }
 
             html += `
-                <tr class="${rowClass}" id="med_row_${idx}">
+                <tr class="${rowClass}" style="${rowStyle}" id="med_row_${idx}">
                     <td class="text-center">
                         <div class="d-flex flex-column gap-1 align-items-center">
                             <button type="button" class="btn btn-sm ${isOff ? 'btn-secondary' : 'btn-success'} fw-bold w-100 py-1"
                                 onclick="toggleItemOff(${idx})" title="คลิกเพื่อเปิด/ปิด (ON/OFF) การสั่งใช้ยาตัวนี้">
                                 <i class="bi ${isOff ? 'bi-toggle-off' : 'bi-toggle-on'} me-1"></i>${isOff ? 'OFF (งด)' : 'ON (สั่ง)'}
                             </button>
+                            <select name="items[${idx}][bag_group]" id="bag_group_${idx}"
+                                class="form-select form-select-sm py-0 px-1 fw-semibold"
+                                style="font-size: 0.7rem; ${bagMeta ? 'border-color: ' + bagMeta.color + '; color: ' + bagMeta.color + ';' : ''}"
+                                onchange="onBagGroupChange(${idx}, this.value)"
+                                title="เลือกกลุ่มถุงรวม หากต้องการผสมยาเคมีบำบัดหลายตัวลงในขวด/ถุงเดียวกัน" ${disabledAttr}>
+                                ${bagGroupOptions}
+                            </select>
                             ${item.is_custom ? `
                                 <input type="hidden" name="items[${idx}][orderno]" id="orderno_${idx}" value="${item.orderno || (idx + 1)}" ${disabledAttr}>
                                 <button type="button" class="btn btn-xs btn-outline-danger btn-sm py-0 px-2 w-100" style="font-size: 0.7rem;"
@@ -1132,10 +1327,18 @@
                         </div>
                         <div id="band_chips_${idx}" class="d-flex justify-content-end gap-1 mt-1 flex-wrap"></div>
                     </td>
-                    <td>
-                        <select name="items[${idx}][soln]" class="form-select form-select-sm" ${disabledAttr}>
+                    <td style="min-width: 210px;">
+                        <select name="items[${idx}][soln]" class="form-select form-select-sm"
+                            onchange="onBagSharedFieldChange(${idx}, 'soln', this.value)" ${disabledAttr}>
                             ${solOptions}
                         </select>
+                        <input type="hidden" name="items[${idx}][additives_json]" id="additives_json_${idx}"
+                            value="${escapeHtmlAttr(JSON.stringify(additivesArr))}" ${disabledAttr}>
+                        ${additivesRowsHtml}
+                        <button type="button" class="btn btn-outline-info btn-sm py-0 px-2 mt-1 w-100 fw-semibold" style="font-size: 0.7rem;"
+                            onclick="addAdditiveToItem(${idx})" ${disabledAttr}>
+                            <i class="bi bi-plus-circle me-1"></i>ผสมสารอื่นในขวดนี้ (NaHCO3 / Mannitol / KCl...)
+                        </button>
                     </td>
                     <td style="min-width: 145px;">
                         <div class="input-group input-group-sm">
@@ -1144,15 +1347,18 @@
                                 id="solvol_${idx}"
                                 class="form-control text-end fw-bold fs-6 px-2"
                                 style="min-width: 80px;"
-                                value="${item.solvol}" ${disabledAttr}>
+                                value="${item.solvol}"
+                                oninput="onBagSharedFieldChange(${idx}, 'solvol', this.value)" ${disabledAttr}>
                             <span class="input-group-text px-2 fw-semibold">mL</span>
                         </div>
                     </td>
                     <td>
-                        <select name="items[${idx}][medroute]" class="form-select form-select-sm mb-1" ${disabledAttr}>
+                        <select name="items[${idx}][medroute]" class="form-select form-select-sm mb-1"
+                            onchange="onBagSharedFieldChange(${idx}, 'medroute', this.value)" ${disabledAttr}>
                             ${routeOptions}
                         </select>
-                        <select name="items[${idx}][medtime]" class="form-select form-select-sm" ${disabledAttr}>
+                        <select name="items[${idx}][medtime]" class="form-select form-select-sm"
+                            onchange="onBagSharedFieldChange(${idx}, 'medtime', this.value)" ${disabledAttr}>
                             ${timeOptions}
                         </select>
                     </td>

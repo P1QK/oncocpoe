@@ -15,16 +15,25 @@ class RegimenDetail extends Model
     protected $fillable = [
         'rd_id',
         'rd_orderno',
+        'rd_bag_group',
         'rd_medcode',
         'rd_meddose',
         'rd_medunit',
         'rd_sol',
         'rd_solvol',
+        'rd_additives',
         'rd_medroute',
         'rd_medtime',
         'rd_start',
         'rd_duration',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'rd_additives' => 'array',
+        ];
+    }
 
     public function regimen(): BelongsTo
     {

@@ -39,6 +39,41 @@
             font-weight: 700;
             text-align: center;
         }
+        .bag-group-row td {
+            background-color: #faf5ff;
+        }
+        .bag-group-badge {
+            display: inline-block;
+            background-color: #6d28d9;
+            color: #fff;
+            font-weight: 700;
+            font-size: 9.5px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            line-height: 1.2;
+        }
+        .bag-alert-box {
+            background-color: #fef3c7;
+            border: 1.5px solid #d97706;
+            color: #92400e;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 2px 5px;
+            border-radius: 4px;
+            margin-top: 3px;
+            display: inline-block;
+        }
+        .additive-chip {
+            display: block;
+            background-color: #e0f2fe;
+            border: 1px solid #0284c7;
+            color: #0c4a6e;
+            font-weight: 700;
+            font-size: 10px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 3px;
+        }
         .header-box {
             border: 1.5px solid #0f172a;
             border-radius: 6px;
@@ -128,63 +163,156 @@
             @endif
         </div>
 
-        <!-- ตารางรายการยาที่ผู้ป่วยได้รับ จำนวนวัน และช่วงวันที่รับยา -->
+        <!-- ตารางรายการยาที่ผู้ป่วยได้รับ จำนวนวัน และช่วงวันที่รับยา (จัดกลุ่มตามถุงจริงป้องกันจัดสารน้ำแยกขวด) -->
+        @php
+            $sortedDetails = $order->details->sortBy('or_orderno')->values();
+            $wfBags = collect();
+            $wfBagMap = [];
+            foreach ($sortedDetails as $sIdx => $sd) {
+                $bKey = !empty($sd->or_bag_group)
+                    ? ('BAG:' . $sd->or_bag_group)
+                    : ('SINGLE:' . $sd->or_orderno . '_' . $sIdx);
+                if (!isset($wfBagMap[$bKey])) {
+                    $wfBagMap[$bKey] = $wfBags->count();
+                    $wfBags->push((object)[
+                        'bag_group' => $sd->or_bag_group,
+                        'items'     => collect([$sd]),
+                    ]);
+                } else {
+                    $wfBags[$wfBagMap[$bKey]]->items->push($sd);
+                }
+            }
+            $hasAnyMultiBag = $wfBags->contains(fn($b) => $b->items->count() > 1);
+        @endphp
+
+        @if($hasAnyMultiBag)
+            <div class="alert alert-warning py-1 px-2 mb-2 border-warning d-flex align-items-center gap-2" style="font-size: 11px;">
+                <i class="bi bi-exclamation-triangle-fill text-danger fs-6"></i>
+                <div>
+                    <strong>คำเตือนสำหรับพนักงานจัดยาและผู้เตรียมยา:</strong>
+                    คำสั่งนี้มีรายการยาที่ <strong>ผสมรวมลงในขวด/ถุงสารน้ำเดียวกัน</strong> (ช่องสารน้ำถูกรวมเป็น 1 เซลล์)
+                    กรุณาจัดสารน้ำเจือจาง <strong>เพียง 1 ขวด/ถุง</strong> ต่อกลุ่มถุงรวมตามที่ระบุ
+                </div>
+            </div>
+        @endif
+
         <table class="table table-wf mb-2">
             <thead>
                 <tr>
-                    <th style="width: 28px;">#</th>
+                    <th style="width: 58px;">ลำดับถุง<br>(Bag)</th>
                     <th>รายการยาเคมีบำบัด (ความเข้มข้น)</th>
-                    <th style="width: 85px;">ขนาดยาที่ได้รับ<br>(Dose)</th>
-                    <th style="width: 78px;">ปริมาตรเตรียม<br>(Working mL)</th>
-                    <th style="width: 120px;">สารน้ำเจือจาง &amp; ปริมาตร</th>
+                    <th style="width: 82px;">ขนาดยาที่ได้รับ<br>(Dose)</th>
+                    <th style="width: 76px;">ปริมาตรเตรียม<br>(Working mL)</th>
+                    <th style="width: 145px;">สารน้ำเจือจาง &amp; สารผสมในขวด</th>
                     <th style="width: 72px;">ปริมาตรรวม<br>(Total mL)</th>
-                    <th style="width: 110px;">วิถีทาง / เวลาให้ยา</th>
-                    <th style="width: 55px;">จำนวนวัน<br>ที่รับยา</th>
-                    <th style="width: 125px;">วันที่เริ่มยา &ndash; สิ้นสุด<br>(Start &ndash; Stop)</th>
+                    <th style="width: 105px;">วิถีทาง / เวลาให้ยา</th>
+                    <th style="width: 50px;">จำนวน<br>วัน</th>
+                    <th style="width: 115px;">วันที่เริ่มยา &ndash; สิ้นสุด<br>(Start &ndash; Stop)</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($order->details as $d)
+                @foreach($wfBags as $bIdx => $bag)
                     @php
-                        $daysCount = \Carbon\Carbon::parse($d->or_start)->diffInDays(\Carbon\Carbon::parse($d->or_stop)) + 1;
-                        $conc = optional($d->medication)->dg_conc ?? 1;
+                        $rowspan = $bag->items->count();
+                        $isMulti = $rowspan > 1;
+                        $first = $bag->items->first();
+                        $daysCount = \Carbon\Carbon::parse($first->or_start)->diffInDays(\Carbon\Carbon::parse($first->or_stop)) + 1;
+
+                        $sumWorking = (float) $bag->items->sum('or_working');
+                        $allAdditives = [];
+                        $sumAddVol = 0;
+                        foreach ($bag->items as $bi) {
+                            if (!empty($bi->or_additives) && is_array($bi->or_additives)) {
+                                foreach ($bi->or_additives as $ad) {
+                                    $t = trim((string) ($ad['name'] ?? ''));
+                                    if (!empty($ad['dose'])) {
+                                        $t .= ' ' . trim($ad['dose'] . ' ' . ($ad['unit'] ?? ''));
+                                    }
+                                    if (!empty($ad['vol_ml']) && (float) $ad['vol_ml'] > 0) {
+                                        $t .= ' (' . $ad['vol_ml'] . ' mL)';
+                                    }
+                                    if ($t !== '') {
+                                        $allAdditives[] = $t;
+                                    }
+                                    $sumAddVol += (float) ($ad['vol_ml'] ?? 0);
+                                }
+                            }
+                        }
+                        $bagTotalVol = (float) $first->or_solvol + $sumWorking + $sumAddVol;
                     @endphp
-                    <tr>
-                        <td class="text-center fw-bold">{{ $d->or_orderno }}</td>
-                        <td>
-                            <div class="fw-bold">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
-                            <small class="text-secondary">
-                                Conc: {{ number_format($conc, 2) }} mg/mL
-                                @if(($d->or_reduce_pct ?? 0) > 0)
-                                    (ลด {{ number_format($d->or_reduce_pct, 0) }}% จาก {{ number_format($d->or_std_dose, 2) }} mg)
-                                @endif
-                            </small>
-                        </td>
-                        <td class="text-end fw-bold fs-6">
-                            {{ number_format($d->or_meddose, 2) }} {{ optional($d->unit)->un_unit ?? 'mg' }}
-                        </td>
-                        <td class="text-end fw-bold fs-6 bg-warning-subtle">
-                            {{ number_format($d->or_working, 2) }} mL
-                        </td>
-                        <td>
-                            {{ optional($d->solution)->so_name ?? $d->or_soln }}<br>
-                            <strong>{{ number_format($d->or_solvol, 0) }} mL</strong>
-                        </td>
-                        <td class="text-end fw-semibold">
-                            {{ number_format($d->or_totalvol, 2) }} mL
-                        </td>
-                        <td>
-                            {{ optional($d->route)->rt_name ?? $d->or_medroute }}<br>
-                            <small class="fw-semibold">{{ optional($d->timing)->tm_time ?? $d->or_medtime }}</small>
-                        </td>
-                        <td class="text-center fw-bold fs-6">
-                            {{ $daysCount }} วัน
-                        </td>
-                        <td class="text-center fw-semibold">
-                            {{ \Carbon\Carbon::parse($d->or_start)->format('d/m/Y') }}<br>
-                            ถึง {{ \Carbon\Carbon::parse($d->or_stop)->format('d/m/Y') }}
-                        </td>
-                    </tr>
+
+                    @foreach($bag->items as $mIdx => $d)
+                        @php
+                            $conc = optional($d->medication)->dg_conc ?? 1;
+                        @endphp
+                        <tr class="{{ $isMulti ? 'bag-group-row' : '' }}">
+                            @if($mIdx === 0)
+                                <td class="text-center fw-bold" rowspan="{{ $rowspan }}"
+                                    style="{{ $isMulti ? 'border-left: 4px solid #6d28d9 !important;' : '' }}">
+                                    <div class="fs-6">{{ $bIdx + 1 }}/{{ $wfBags->count() }}</div>
+                                    @if($isMulti || !empty($bag->bag_group))
+                                        <span class="bag-group-badge mt-1">รวมขวด<br>{{ $bag->bag_group }}</span>
+                                        <div class="small fw-bold mt-1" style="color:#6d28d9; font-size:9px;">({{ $rowspan }} ตัวยา)</div>
+                                    @endif
+                                </td>
+                            @endif
+
+                            <td>
+                                <div class="fw-bold">
+                                    @if($isMulti && $mIdx > 0)<span style="color:#6d28d9;">+ </span>@endif
+                                    [{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}
+                                </div>
+                                <small class="text-secondary">
+                                    Conc: {{ number_format($conc, 2) }} mg/mL
+                                    @if(($d->or_reduce_pct ?? 0) > 0)
+                                        (ลด {{ number_format($d->or_reduce_pct, 0) }}% จาก {{ number_format($d->or_std_dose, 2) }} mg)
+                                    @endif
+                                </small>
+                            </td>
+                            <td class="text-end fw-bold fs-6">
+                                {{ number_format($d->or_meddose, 2) }} {{ optional($d->unit)->un_unit ?? 'mg' }}
+                            </td>
+                            <td class="text-end fw-bold fs-6 bg-warning-subtle">
+                                {{ number_format($d->or_working, 2) }} mL
+                            </td>
+
+                            @if($mIdx === 0)
+                                <td rowspan="{{ $rowspan }}">
+                                    <div class="fw-bold">
+                                        {{ optional($first->solution)->so_name ?? $first->or_soln }}
+                                        <span class="text-primary">{{ number_format($first->or_solvol, 0) }} mL</span>
+                                    </div>
+                                    @if($isMulti)
+                                        <div class="bag-alert-box">
+                                            <i class="bi bi-layers-fill me-1"></i>ผสมรวมในขวด/ถุงนี้ (จัด 1 ถุง)
+                                        </div>
+                                    @endif
+                                    @foreach($allAdditives as $adText)
+                                        <span class="additive-chip">+ {{ $adText }}</span>
+                                    @endforeach
+                                </td>
+                                <td class="text-end fw-bold" rowspan="{{ $rowspan }}">
+                                    <div>{{ number_format($bagTotalVol, 2) }} mL</div>
+                                    @if($isMulti || $sumAddVol > 0)
+                                        <small class="text-secondary fw-normal" style="font-size: 9px;">
+                                            (ดูดยารวม {{ number_format($sumWorking, 2) }} mL)
+                                        </small>
+                                    @endif
+                                </td>
+                                <td rowspan="{{ $rowspan }}">
+                                    {{ optional($first->route)->rt_name ?? $first->or_medroute }}<br>
+                                    <small class="fw-semibold">{{ optional($first->timing)->tm_time ?? $first->or_medtime }}</small>
+                                </td>
+                                <td class="text-center fw-bold fs-6" rowspan="{{ $rowspan }}">
+                                    {{ $daysCount }} วัน
+                                </td>
+                                <td class="text-center fw-semibold" rowspan="{{ $rowspan }}">
+                                    {{ \Carbon\Carbon::parse($first->or_start)->format('d/m/Y') }}<br>
+                                    ถึง {{ \Carbon\Carbon::parse($first->or_stop)->format('d/m/Y') }}
+                                </td>
+                            @endif
+                        </tr>
+                    @endforeach
                 @endforeach
             </tbody>
         </table>

@@ -10,7 +10,10 @@
         </h4>
         <small class="text-secondary">สั่งใช้โดย: {{ $order->or_doctor_name ?? 'แพทย์ผู้สั่งรักษา' }} | วันที่เริ่มให้ยา: {{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}</small>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold shadow-sm">
+            <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)
+        </a>
         @if(auth()->user()->canAccessPharmacist())
             <a href="{{ route('pharmacist.show', $order->or_id) }}" class="btn btn-success fw-semibold">
                 <i class="bi bi-capsule me-1"></i> ไปที่หน้าตรวจสอบของเภสัชกร
@@ -189,7 +192,14 @@
                     <tr>
                         <td class="text-center fw-bold">{{ $d->or_orderno }}</td>
                         <td>
-                            <div class="fw-bold text-primary">[{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}</div>
+                            <div class="fw-bold text-primary">
+                                [{{ $d->or_medcode }}] {{ optional($d->medication)->dg_name ?? $d->or_medcode }}
+                                @if($d->or_bag_group)
+                                    <span class="badge text-white ms-1" style="background-color: #7c3aed;">
+                                        <i class="bi bi-layers-fill me-1"></i>ผสมรวม {{ $d->or_bag_group }}
+                                    </span>
+                                @endif
+                            </div>
                             <small class="text-muted">{{ optional($d->medication)->dg_fullname }}</small>
                         </td>
                         <td class="text-end">{{ number_format($d->or_std_dose ?? $d->or_meddose, 2) }} mg</td>
@@ -206,6 +216,17 @@
                         <td>
                             <div>{{ optional($d->solution)->so_name ?? $d->or_soln }} <strong>{{ number_format($d->or_solvol, 0) }} mL</strong></div>
                             <small class="text-secondary">ดูดยา: {{ number_format($d->or_working, 2) }} mL | รวม: {{ number_format($d->or_totalvol, 2) }} mL</small>
+                            @if(!empty($d->or_additives) && is_array($d->or_additives))
+                                <div class="mt-1 d-flex flex-wrap gap-1">
+                                    @foreach($d->or_additives as $ad)
+                                        <span class="badge bg-info-subtle text-dark border border-info-subtle" style="font-size: 0.72rem;">
+                                            + {{ $ad['name'] ?? '' }}
+                                            @if(!empty($ad['dose'])) {{ $ad['dose'] }} {{ $ad['unit'] ?? '' }}@endif
+                                            @if(!empty($ad['vol_ml']) && (float)$ad['vol_ml'] > 0) ({{ $ad['vol_ml'] }} mL)@endif
+                                        </span>
+                                    @endforeach
+                                </div>
+                            @endif
                         </td>
                         <td>
                             <div>{{ optional($d->route)->rt_name ?? $d->or_medroute }}</div>

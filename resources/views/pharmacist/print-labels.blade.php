@@ -199,6 +199,28 @@
 
 <div class="labels-grid">
     @foreach($labelsByDate as $dateStr => $dayItems)
+        @php
+            // จัดกลุ่มรายการยารายวันเป็นถุงจริง (Bag Group) เพื่อให้ยาที่ผสมรวมในถุงเดียวกันพิมพ์สติกเกอร์รวมเป็น 1 ดวง (9x7 cm)
+            $sortedDayItems = $dayItems->sortBy('or_orderno')->values();
+            $dayBags = collect();
+            $bagKeyMap = [];
+            foreach ($sortedDayItems as $sIdx => $sItem) {
+                $bKey = !empty($sItem->or_bag_group)
+                    ? ('BAG:' . $sItem->or_bag_group)
+                    : ('SINGLE:' . $sItem->or_orderno . '_' . $sIdx);
+                if (!isset($bagKeyMap[$bKey])) {
+                    $bagKeyMap[$bKey] = $dayBags->count();
+                    $dayBags->push((object)[
+                        'bag_group' => $sItem->or_bag_group,
+                        'items'     => collect([$sItem]),
+                    ]);
+                } else {
+                    $dayBags[$bagKeyMap[$bKey]]->items->push($sItem);
+                }
+            }
+            $dayBagsCount = $dayBags->count();
+        @endphp
+
         <!-- 1. สติกเกอร์สรุปรายการยาของคนไข้ประจำวันนั้น (ขนาด 9 cm x 7 cm) -->
         <div class="chemo-label-card summary-label-card">
             <div class="d-flex justify-content-between align-items-center summary-banner mb-1">
@@ -224,13 +246,13 @@
             <div class="bg-white border border-primary rounded-1 p-1 summary-body-box">
                 <div class="fw-bold text-primary mb-1 d-flex justify-content-between align-items-center" style="font-size: 8.5px;">
                     <span>รายการยาที่ได้รับวันนี้:</span>
-                    <span class="badge bg-primary" style="font-size: 7.5px;">รวม {{ $dayItems->count() }} รายการ</span>
+                    <span class="badge bg-primary" style="font-size: 7.5px;">รวม {{ $dayBagsCount }} ขวด/ถุง</span>
                 </div>
                 <table class="table table-bordered summary-table mb-0">
                     <thead class="table-light text-center">
                         <tr>
                             <th style="width: 30px;">ลำดับ</th>
-                            <th>ชื่อยา</th>
+                            <th>ชื่อยา / สารผสม</th>
                             <th>ขนาด</th>
                             <th>สารน้ำ/รวม</th>
                             <th>วิธี/เวลา</th>
@@ -238,23 +260,43 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($dayItems->sortBy('or_orderno')->values() as $dIdx => $dItem)
+                        @foreach($dayBags as $bIdx => $bag)
+                            @php
+                                $firstItem = $bag->items->first();
+                                $isMulti = $bag->items->count() > 1;
+                                $drugNamesStr = $bag->items->map(fn($it) => optional($it->medication)->dg_name ?? $it->or_medcode)->implode(' + ');
+                                $dosesStr = $bag->items->map(fn($it) => number_format($it->or_meddose, 1) . ' ' . (optional($it->unit)->un_unit ?? 'mg'))->implode(' / ');
+                                $bagAddVol = 0;
+                                $addNames = [];
+                                foreach ($bag->items as $bi) {
+                                    if (!empty($bi->or_additives) && is_array($bi->or_additives)) {
+                                        foreach ($bi->or_additives as $ad) {
+                                            $addNames[] = $ad['name'] ?? '';
+                                            $bagAddVol += (float) ($ad['vol_ml'] ?? 0);
+                                        }
+                                    }
+                                }
+                                $bagTotalVol = (float) $firstItem->or_solvol + (float) $bag->items->sum('or_working') + $bagAddVol;
+                            @endphp
                             <tr>
-                                <td class="text-center fw-bold text-primary text-nowrap">{{ $dIdx + 1 }}/{{ $dayItems->count() }}</td>
-                                <td class="fw-bold text-danger text-truncate" style="max-width: 70px;">
-                                    {{ optional($dItem->medication)->dg_name ?? $dItem->or_medcode }}
+                                <td class="text-center fw-bold text-primary text-nowrap">{{ $bIdx + 1 }}/{{ $dayBagsCount }}</td>
+                                <td class="fw-bold text-danger text-truncate" style="max-width: 82px;">
+                                    @if($isMulti)[รวม] @endif{{ $drugNamesStr }}
+                                    @if(count($addNames) > 0)
+                                        <span class="text-primary fw-normal"> +{{ implode('+', $addNames) }}</span>
+                                    @endif
                                 </td>
                                 <td class="text-end fw-bold text-nowrap">
-                                    {{ number_format($dItem->or_meddose, 1) }} {{ optional($dItem->unit)->un_unit ?? 'mg' }}
+                                    {{ $isMulti ? ($bag->items->count() . ' ยา') : $dosesStr }}
                                 </td>
                                 <td class="text-nowrap">
-                                    {{ $dItem->or_soln }} ({{ number_format($dItem->or_totalvol, 0) }}mL)
+                                    {{ $firstItem->or_soln }} ({{ number_format($bagTotalVol, 0) }}mL)
                                 </td>
-                                <td class="text-truncate" style="max-width: 65px;">
-                                    {{ optional($dItem->timing)->tm_time ?? $dItem->or_medtime }}
+                                <td class="text-truncate" style="max-width: 60px;">
+                                    {{ optional($firstItem->timing)->tm_time ?? $firstItem->or_medtime }}
                                 </td>
                                 <td class="text-center text-nowrap">
-                                    {{ $dItem->or_text ?: '-' }}
+                                    {{ $firstItem->or_text ?: '-' }}
                                 </td>
                             </tr>
                         @endforeach
@@ -273,14 +315,35 @@
             </div>
         </div>
 
-        <!-- 2. สติกเกอร์ยารายขวด/ถุง ของคนไข้ในวันนั้น (ขนาด 9 cm x 7 cm) -->
-        @foreach($dayItems->sortBy('or_orderno')->values() as $itemIdx => $lbl)
+        <!-- 2. สติกเกอร์ยารายขวด/ถุง ของคนไข้ในวันนั้น (ขนาด 9 cm x 7 cm — รวมถุงพิมพ์ 1 ดวง) -->
+        @foreach($dayBags as $bIdx => $bag)
             @php
-                $seqText = ($itemIdx + 1) . '/' . $dayItems->count();
+                $lbl = $bag->items->first();
+                $isMulti = $bag->items->count() > 1;
+                $seqText = ($bIdx + 1) . '/' . $dayBagsCount;
+
+                $sumWorking = (float) $bag->items->sum('or_working');
+                $allAdditives = [];
+                $sumAddVol = 0;
+                foreach ($bag->items as $bi) {
+                    if (!empty($bi->or_additives) && is_array($bi->or_additives)) {
+                        foreach ($bi->or_additives as $ad) {
+                            $allAdditives[] = $ad;
+                            $sumAddVol += (float) ($ad['vol_ml'] ?? 0);
+                        }
+                    }
+                }
+                $bagTotalVol = (float) $lbl->or_solvol + $sumWorking + $sumAddVol;
+                $bagPrecautions = $bag->items->map(fn($it) => optional($it->medication)->dg_precaution)->filter()->unique()->implode(' | ');
             @endphp
             <div class="chemo-label-card">
                 <div class="d-flex justify-content-between align-items-center chemo-banner mb-1">
-                    <span><i class="bi bi-radioactive me-1"></i> ลำดับการให้ยา: {{ $seqText }}</span>
+                    <span>
+                        <i class="bi bi-radioactive me-1"></i> ลำดับ: {{ $seqText }}
+                        @if($isMulti || !empty($bag->bag_group))
+                            <span class="badge bg-warning text-dark ms-1" style="font-size: 8px;">ผสมรวม {{ $bag->bag_group }}</span>
+                        @endif
+                    </span>
                     <span>{{ \Carbon\Carbon::parse($lbl->or_daterec)->format('d/m/Y') }} ({{ $lbl->or_text }})</span>
                 </div>
 
@@ -296,18 +359,51 @@
                 </div>
 
                 <div class="drug-box">
-                    <div class="d-flex justify-content-between align-items-baseline">
-                        <div class="drug-title text-danger text-truncate pe-1">
-                            <span class="badge bg-danger me-1" style="font-size: 9px;">{{ $seqText }}</span>{{ optional($lbl->medication)->dg_name ?? $lbl->or_medcode }}
+                    @if($isMulti)
+                        @foreach($bag->items as $mIdx => $mItem)
+                            <div class="d-flex justify-content-between align-items-baseline" style="font-size: 9.5px; line-height: 1.2;">
+                                <div class="fw-bold text-danger text-truncate pe-1">
+                                    {{ $mIdx === 0 ? '' : '+ ' }}{{ optional($mItem->medication)->dg_name ?? $mItem->or_medcode }}
+                                </div>
+                                <div class="fw-bold text-dark text-nowrap">
+                                    {{ number_format($mItem->or_meddose, 2) }} {{ optional($mItem->unit)->un_unit ?? 'mg' }}
+                                    <span class="text-secondary fw-normal" style="font-size: 8px;">({{ number_format($mItem->or_working, 1) }}mL)</span>
+                                </div>
+                            </div>
+                        @endforeach
+                    @else
+                        <div class="d-flex justify-content-between align-items-baseline">
+                            <div class="drug-title text-danger text-truncate pe-1">
+                                <span class="badge bg-danger me-1" style="font-size: 9px;">{{ $seqText }}</span>{{ optional($lbl->medication)->dg_name ?? $lbl->or_medcode }}
+                            </div>
+                            <div class="drug-dose text-dark text-nowrap">
+                                {{ number_format($lbl->or_meddose, 2) }} {{ optional($lbl->unit)->un_unit ?? 'mg' }}
+                            </div>
                         </div>
-                        <div class="drug-dose text-dark text-nowrap">
-                            {{ number_format($lbl->or_meddose, 2) }} {{ optional($lbl->unit)->un_unit ?? 'mg' }}
+                    @endif
+
+                    @if(count($allAdditives) > 0)
+                        @php
+                            $addTextList = collect($allAdditives)->map(function ($ad) {
+                                $t = trim((string) ($ad['name'] ?? ''));
+                                if (!empty($ad['dose'])) {
+                                    $t .= ' ' . trim($ad['dose'] . ' ' . ($ad['unit'] ?? ''));
+                                }
+                                if (!empty($ad['vol_ml']) && (float) $ad['vol_ml'] > 0) {
+                                    $t .= ' (' . $ad['vol_ml'] . 'mL)';
+                                }
+                                return $t;
+                            })->filter()->implode(', ');
+                        @endphp
+                        <div class="text-primary fw-bold mt-1" style="font-size: 8.5px; line-height: 1.15;">
+                            + สารผสม: {{ $addTextList }}
                         </div>
-                    </div>
+                    @endif
+
                     <div class="mt-1">
                         <strong>สารน้ำ:</strong> {{ optional($lbl->solution)->so_name ?? $lbl->or_soln }}
                         <strong>{{ number_format($lbl->or_solvol, 0) }} mL</strong>
-                        (ดูดยา {{ number_format($lbl->or_working, 2) }} mL | รวม <strong>{{ number_format($lbl->or_totalvol, 2) }} mL</strong>)
+                        (ดูดยา {{ number_format($sumWorking, 2) }} mL | รวม <strong>{{ number_format($bagTotalVol, 2) }} mL</strong>)
                     </div>
                     <div class="mt-1">
                         <strong>วิธีให้:</strong> {{ optional($lbl->route)->rt_name ?? $lbl->or_medroute }}
@@ -315,9 +411,9 @@
                     </div>
                 </div>
 
-                @if(optional($lbl->medication)->dg_precaution)
+                @if($bagPrecautions)
                     <div class="precaution-line text-danger my-1">
-                        <strong>ระวัง:</strong> {{ optional($lbl->medication)->dg_precaution }}
+                        <strong>ระวัง:</strong> {{ $bagPrecautions }}
                     </div>
                 @endif
 

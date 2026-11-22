@@ -2,10 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChemoAdditive;
+use App\Models\Medcyto;
 use App\Models\OncDayRecord;
 use App\Models\OrderDetail;
 use App\Models\OrderHeader;
 use App\Models\RegimenHeader;
+use App\Models\Route as MedRoute;
+use App\Models\Solution;
+use App\Models\Timing;
+use App\Models\Unit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -109,6 +115,244 @@ class PharmacistController extends Controller
             && RegimenHeader::where('rh_code', $order->or_reg_code)->exists();
 
         return view('pharmacist.show', compact('order', 'groupedDayRecords', 'hasRegimen'));
+    }
+
+    /**
+     * หน้าแก้ไขคำสั่งใช้ยาเคมีบำบัดสำหรับเภสัชกร (เฉพาะรายการยาเคมีบำบัดใน order_d หลังปรึกษาแพทย์)
+     */
+    public function edit(string $orId)
+    {
+        $order = OrderHeader::with([
+            'details.medication',
+            'details.unit',
+            'details.solution',
+            'details.route',
+            'details.timing',
+            'ward',
+        ])->findOrFail($orId);
+
+        $meds      = Medcyto::orderBy('dg_name')->get();
+        $units     = Unit::orderBy('un_code')->get();
+        $solutions = Solution::orderBy('so_code')->get();
+        $routes    = MedRoute::orderBy('rt_code')->get();
+        $timings   = Timing::orderBy('tm_code')->get();
+        $additives = ChemoAdditive::where('is_active', true)->orderBy('sort_order')->get();
+
+        $initialItems = $order->details->sortBy('or_orderno')->values()->map(function ($d, $idx) use ($order) {
+            return [
+                'orderno'    => (int) ($d->or_orderno ?: ($idx + 1)),
+                'bag_group'  => $d->or_bag_group ?? '',
+                'additives'  => is_array($d->or_additives) ? $d->or_additives : [],
+                'medcode'    => $d->or_medcode,
+                'dg_name'    => optional($d->medication)->dg_name ?? $d->or_medcode,
+                'dg_conc'    => (float) (optional($d->medication)->dg_conc ?: 1),
+                'std_dose'   => (float) ($d->or_std_dose ?? $d->or_meddose ?? 0),
+                'reduce_pct' => (float) ($d->or_reduce_pct ?? 0),
+                'meddose'    => (float) ($d->or_meddose ?? 0),
+                'medunit'    => $d->or_medunit ?: '01',
+                'soln'       => $d->or_soln ?: 'NSS',
+                'solvol'     => (float) ($d->or_solvol ?? 0),
+                'medroute'   => $d->or_medroute ?: '01',
+                'medtime'    => $d->or_medtime ?: '03',
+                'or_start'   => $d->or_start ? Carbon::parse($d->or_start)->format('Y-m-d') : Carbon::parse($order->or_date)->format('Y-m-d'),
+                'or_stop'    => $d->or_stop ? Carbon::parse($d->or_stop)->format('Y-m-d') : Carbon::parse($order->or_date)->format('Y-m-d'),
+            ];
+        })->values();
+
+        return view('pharmacist.edit', compact(
+            'order',
+            'meds',
+            'units',
+            'solutions',
+            'routes',
+            'timings',
+            'additives',
+            'initialItems'
+        ));
+    }
+
+    /**
+     * บันทึกการแก้ไขคำสั่งใช้ยาเคมีบำบัดโดยเภสัชกร (ไม่กระทบ Pre-med / Hydration / Post-med / Home-med)
+     */
+    public function update(Request $request, string $orId)
+    {
+        $order = OrderHeader::with(['details'])->findOrFail($orId);
+
+        $validated = $request->validate([
+            'edit_reason'            => ['nullable', 'string', 'max:255'],
+            'resync_day_records'     => ['nullable', 'boolean'],
+            'items'                  => ['required', 'array', 'min:1'],
+            'items.*.orderno'        => ['required', 'integer', 'min:1', 'max:99'],
+            'items.*.bag_group'      => ['nullable', 'string', 'max:20'],
+            'items.*.additives_json' => ['nullable', 'string'],
+            'items.*.medcode'        => ['required', 'string', 'max:20'],
+            'items.*.std_dose'       => ['nullable', 'numeric', 'min:0'],
+            'items.*.reduce_pct'     => ['nullable', 'numeric', 'min:0', 'max:90'],
+            'items.*.meddose'        => ['required', 'numeric', 'min:0.01'],
+            'items.*.medunit'        => ['required', 'string', 'max:10'],
+            'items.*.soln'           => ['required', 'string', 'max:20'],
+            'items.*.solvol'         => ['required', 'numeric', 'min:0'],
+            'items.*.medroute'       => ['required', 'string', 'max:10'],
+            'items.*.medtime'        => ['required', 'string', 'max:10'],
+            'items.*.or_start'       => ['required', 'date'],
+            'items.*.or_stop'        => ['required', 'date'],
+        ]);
+
+        $medsMap = Medcyto::all()->keyBy('dg_code');
+        $resyncDays = $order->or_confirm == 1 && $request->boolean('resync_day_records', true);
+
+        DB::transaction(function () use ($order, $validated, $medsMap, $resyncDays) {
+            // เรียงรายการตาม or_orderno
+            $items = collect($validated['items'])->sortBy(fn ($i) => (int) $i['orderno'])->values();
+
+            // 1. แทนที่เฉพาะรายการยาเคมีบำบัดใน order_d (ไม่แตะต้อง order_supportive_meds)
+            DB::table('order_d')->where('or_id', $order->or_id)->delete();
+
+            $createdDetails = [];
+            $maxReducePct = 0;
+
+            foreach ($items as $idx => $item) {
+                $med = $medsMap->get($item['medcode']);
+                $conc = ($med && $med->dg_conc > 0) ? (float) $med->dg_conc : 1.0;
+
+                $finalDose = (float) $item['meddose'];
+                $stdDose   = isset($item['std_dose']) && $item['std_dose'] > 0 ? (float) $item['std_dose'] : $finalDose;
+                $reducePct = (float) ($item['reduce_pct'] ?? 0);
+                if ($reducePct > $maxReducePct) {
+                    $maxReducePct = $reducePct;
+                }
+
+                $workingVol = round($finalDose / $conc, 2);
+                $solVol     = (float) $item['solvol'];
+
+                // Parse additives JSON
+                $additives = [];
+                $additiveVol = 0.0;
+                if (!empty($item['additives_json'])) {
+                    $decoded = json_decode($item['additives_json'], true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $ad) {
+                            $adName = trim((string) ($ad['name'] ?? ''));
+                            if ($adName !== '') {
+                                $vol = (float) ($ad['vol_ml'] ?? 0);
+                                $additives[] = [
+                                    'code'   => (string) ($ad['code'] ?? 'CUSTOM'),
+                                    'name'   => $adName,
+                                    'dose'   => trim((string) ($ad['dose'] ?? '')),
+                                    'unit'   => trim((string) ($ad['unit'] ?? '')),
+                                    'vol_ml' => $vol,
+                                ];
+                                $additiveVol += $vol;
+                            }
+                        }
+                    }
+                }
+
+                $totalVol = round($solVol + $workingVol + $additiveVol, 2);
+                $startDate = Carbon::parse($item['or_start']);
+                $stopDate  = Carbon::parse($item['or_stop']);
+                if ($stopDate->lt($startDate)) {
+                    $stopDate = $startDate->copy();
+                }
+
+                $bagGroup = !empty($item['bag_group']) ? strtoupper(trim($item['bag_group'])) : null;
+
+                $detail = OrderDetail::create([
+                    'or_id'         => $order->or_id,
+                    'or_medcode'    => $item['medcode'],
+                    'or_meddose'    => $finalDose,
+                    'or_std_dose'   => $stdDose,
+                    'or_reduce_pct' => $reducePct,
+                    'or_medunit'    => $item['medunit'],
+                    'or_soln'       => $item['soln'],
+                    'or_medroute'   => $item['medroute'],
+                    'or_solvol'     => $solVol,
+                    'or_additives'  => !empty($additives) ? $additives : null,
+                    'or_medtime'    => $item['medtime'],
+                    'or_orderno'    => (int) ($item['orderno'] ?: ($idx + 1)),
+                    'or_bag_group'  => $bagGroup,
+                    'or_start'      => $startDate->format('Y-m-d'),
+                    'or_stop'       => $stopDate->format('Y-m-d'),
+                    'or_working'    => $workingVol,
+                    'or_totalvol'   => $totalVol,
+                    'or_cf'         => $order->or_confirm == 1 ? 1 : 0,
+                    'or_hold'       => 0,
+                    'or_discont'    => 0,
+                ]);
+
+                $createdDetails[] = $detail;
+            }
+
+            // 2. บันทึกหมายเหตุการแก้ไขโดยเภสัชกรลงใน order_h (Audit Note)
+            $editReason = trim((string) ($validated['edit_reason'] ?? ''));
+            $headerUpdate = [
+                'or_pharmacist_id'   => Auth::id(),
+                'or_pharmacist_name' => Auth::user()->name,
+            ];
+            if ($maxReducePct > 0 && (float) ($order->or_adjust_percent ?? 0) === 0.0) {
+                $headerUpdate['or_adjust_percent'] = $maxReducePct;
+            }
+            if ($editReason !== '') {
+                $stamp = '[เภสัชกร ' . Auth::user()->name . ' แก้ไข ' . now()->format('d/m H:i') . ': ' . $editReason . ']';
+                $existingReason = trim((string) ($order->or_adjust_reason ?? ''));
+                $combined = $existingReason !== '' ? ($existingReason . ' | ' . $stamp) : $stamp;
+                $headerUpdate['or_adjust_reason'] = mb_substr($combined, 0, 250);
+            }
+            $order->update($headerUpdate);
+
+            // 3. หากเคยกด Confirm แตกวันแล้ว ให้แตก onc_dayrecord ใหม่ให้ตรงกับคำสั่งที่แก้ทันที
+            if ($resyncDays) {
+                DB::table('onc_dayrecord')->where('or_id', $order->or_id)->delete();
+
+                foreach ($createdDetails as $detail) {
+                    $startDate = Carbon::parse($detail->or_start);
+                    $stopDate  = Carbon::parse($detail->or_stop);
+                    $totalDays = $startDate->diffInDays($stopDate) + 1;
+                    $curr = $startDate->copy();
+                    $dayIdx = 1;
+
+                    while ($curr->lte($stopDate)) {
+                        OncDayRecord::create([
+                            'or_check'     => 1,
+                            'or_prep'      => 0,
+                            'or_send'      => 0,
+                            'or_id'        => $order->or_id,
+                            'or_medcode'   => $detail->or_medcode,
+                            'or_meddose'   => $detail->or_meddose,
+                            'or_medunit'   => $detail->or_medunit,
+                            'or_soln'      => $detail->or_soln,
+                            'or_medroute'  => $detail->or_medroute,
+                            'or_solvol'    => $detail->or_solvol,
+                            'or_additives' => $detail->or_additives,
+                            'or_medtime'   => $detail->or_medtime,
+                            'or_orderno'   => $detail->or_orderno,
+                            'or_bag_group' => $detail->or_bag_group,
+                            'or_daterec'   => $curr->format('Y-m-d'),
+                            'or_start'     => $startDate->format('Y-m-d'),
+                            'or_stop'      => $stopDate->format('Y-m-d'),
+                            'or_working'   => $detail->or_working ?? 0,
+                            'or_totalvol'  => $detail->or_totalvol ?? 0,
+                            'or_text'      => "Day {$dayIdx}/{$totalDays}",
+                            'or_recstamp'  => now(),
+                            'or_hold'      => 0,
+                            'or_discont'   => 0,
+                        ]);
+
+                        $curr->addDay();
+                        $dayIdx++;
+                    }
+                }
+            }
+        });
+
+        $msg = 'บันทึกการแก้ไขคำสั่งใช้ยาเคมีบำบัดเรียบร้อยแล้ว';
+        if ($resyncDays) {
+            $msg .= ' พร้อมอัปเดตตารางแตกคำสั่งรายวัน (onc_dayrecord) ใหม่โดยอัตโนมัติ';
+        }
+
+        return redirect()
+            ->route('pharmacist.show', $order->or_id)
+            ->with('success', $msg);
     }
 
     /**
@@ -225,11 +469,13 @@ class PharmacistController extends Controller
                         'or_medcode'  => $detail->or_medcode,
                         'or_meddose'  => $detail->or_meddose,
                         'or_medunit'  => $detail->or_medunit,
-                        'or_soln'     => $detail->or_soln,
-                        'or_medroute' => $detail->or_medroute,
-                        'or_solvol'   => $detail->or_solvol,
-                        'or_medtime'  => $detail->or_medtime,
-                        'or_orderno'  => $detail->or_orderno,
+                        'or_soln'      => $detail->or_soln,
+                        'or_medroute'  => $detail->or_medroute,
+                        'or_solvol'    => $detail->or_solvol,
+                        'or_additives' => $detail->or_additives,
+                        'or_medtime'   => $detail->or_medtime,
+                        'or_orderno'   => $detail->or_orderno,
+                        'or_bag_group' => $detail->or_bag_group,
                         'or_daterec'  => $currentDate->format('Y-m-d'),
                         'or_start'    => $startDate->format('Y-m-d'),
                         'or_stop'     => $stopDate->format('Y-m-d'),
@@ -351,11 +597,13 @@ class PharmacistController extends Controller
                         'or_medcode'  => $d->or_medcode,
                         'or_meddose'  => $d->or_meddose,
                         'or_medunit'  => $d->or_medunit,
-                        'or_soln'     => $d->or_soln,
-                        'or_solvol'   => $d->or_solvol,
-                        'or_medroute' => $d->or_medroute,
-                        'or_medtime'  => $d->or_medtime,
-                        'or_orderno'  => $d->or_orderno,
+                        'or_soln'      => $d->or_soln,
+                        'or_solvol'    => $d->or_solvol,
+                        'or_additives' => $d->or_additives,
+                        'or_medroute'  => $d->or_medroute,
+                        'or_medtime'   => $d->or_medtime,
+                        'or_orderno'   => $d->or_orderno,
+                        'or_bag_group' => $d->or_bag_group,
                         'or_daterec'  => $curr->format('Y-m-d'),
                         'or_start'    => $d->or_start,
                         'or_stop'     => $d->or_stop,
@@ -438,11 +686,13 @@ class PharmacistController extends Controller
                         'or_medcode'   => $d->or_medcode,
                         'or_meddose'   => $d->or_meddose,
                         'or_medunit'   => $d->or_medunit,
-                        'or_soln'      => $d->or_soln,
-                        'or_solvol'    => $d->or_solvol,
-                        'or_medroute'  => $d->or_medroute,
-                        'or_medtime'   => $d->or_medtime,
-                        'or_orderno'   => $d->or_orderno,
+                        'or_soln'       => $d->or_soln,
+                        'or_solvol'     => $d->or_solvol,
+                        'or_additives'  => $d->or_additives,
+                        'or_medroute'   => $d->or_medroute,
+                        'or_medtime'    => $d->or_medtime,
+                        'or_orderno'    => $d->or_orderno,
+                        'or_bag_group'  => $d->or_bag_group,
                         'or_daterec'   => $selectedDate,
                         'or_start'     => $d->or_start,
                         'or_stop'      => $d->or_stop,
