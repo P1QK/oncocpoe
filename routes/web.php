@@ -68,6 +68,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/store', [DoctorController::class, 'store'])->name('store');
         Route::get('/order/{orId}', [DoctorController::class, 'show'])->name('show');
         Route::get('/order/{orId}/print', [DoctorController::class, 'printOrder'])->name('print');
+        Route::post('/order/{orId}/cancel', [DoctorController::class, 'cancel'])->name('cancel');
     });
 
     // 3. PHARMACIST SYSTEM (Accessible by superadmin, admin, pharmacist)
@@ -78,9 +79,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/order/{orId}', [PharmacistController::class, 'show'])->name('show');
         Route::get('/order/{orId}/edit', [PharmacistController::class, 'edit'])->name('edit');
         Route::put('/order/{orId}', [PharmacistController::class, 'update'])->name('update');
+        Route::post('/order/{orId}/cancel', [PharmacistController::class, 'cancel'])->name('cancel');
         Route::post('/order/{orId}/sequence', [PharmacistController::class, 'updateSequence'])->name('sequence');
         Route::post('/order/{orId}/confirm', [PharmacistController::class, 'confirm'])->name('confirm');
         Route::post('/order/{orId}/day-status', [PharmacistController::class, 'updateDayStatus'])->name('day-status');
+        Route::get('/order/{orId}/print/order-sheet', [PharmacistController::class, 'printOrder'])->name('print.order');
         Route::get('/order/{orId}/print/working-formula', [PharmacistController::class, 'workingFormula'])->name('print.working-formula');
         Route::get('/order/{orId}/print/labels', [PharmacistController::class, 'medicationLabels'])->name('print.labels');
     });

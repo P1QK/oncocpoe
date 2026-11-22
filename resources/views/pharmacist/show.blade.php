@@ -3,9 +3,10 @@
 @section('title', 'ตรวจสอบคำสั่งและแตกวันให้ยา - ' . $order->or_id)
 
 @section('content')
+@php $isCancelled = (int) ($order->or_cancel ?? 0) === 1; @endphp
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold text-success mb-0">
+        <h4 class="fw-bold {{ $isCancelled ? 'text-danger text-decoration-line-through' : 'text-success' }} mb-0">
             <i class="bi bi-clipboard2-check-fill me-2"></i>ตรวจสอบคำสั่งใช้ยาเคมีบำบัด: {{ $order->or_id }}
         </h4>
         <small class="text-secondary">
@@ -13,41 +14,65 @@
         </small>
     </div>
     <div class="d-flex flex-wrap gap-2">
-        @if($order->or_confirm == 0)
-            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="syncSequencesBeforeConfirm(this)">
-                @csrf
-                <div id="confirmHiddenSequences"></div>
-                <button type="submit" class="btn btn-success fw-bold shadow-sm">
-                    <i class="bi bi-check2-all me-1"></i> Confirm รับคำสั่งใช้ยา &amp; แตกคำสั่งรายวัน
-                </button>
-            </form>
-        @else
-            <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="if(!confirm('ต้องการคำนวณและแตกคำสั่งรายวันใหม่อีกครั้งหรือไม่?')) return false; syncSequencesBeforeConfirm(this);">
-                @csrf
-                <div id="confirmHiddenSequences"></div>
-                <button type="submit" class="btn btn-outline-success">
-                    <i class="bi bi-arrow-repeat me-1"></i> แตกคำสั่งรายวันใหม่
-                </button>
-            </form>
+        @if(!$isCancelled)
+            @if($order->or_confirm == 0)
+                <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="syncSequencesBeforeConfirm(this)">
+                    @csrf
+                    <div id="confirmHiddenSequences"></div>
+                    <button type="submit" class="btn btn-success fw-bold shadow-sm">
+                        <i class="bi bi-check2-all me-1"></i> Confirm รับคำสั่งใช้ยา &amp; แตกคำสั่งรายวัน
+                    </button>
+                </form>
+            @else
+                <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}" id="confirmOrderForm" onsubmit="if(!confirm('ต้องการคำนวณและแตกคำสั่งรายวันใหม่อีกครั้งหรือไม่?')) return false; syncSequencesBeforeConfirm(this);">
+                    @csrf
+                    <div id="confirmHiddenSequences"></div>
+                    <button type="submit" class="btn btn-outline-success">
+                        <i class="bi bi-arrow-repeat me-1"></i> แตกคำสั่งรายวันใหม่
+                    </button>
+                </form>
+            @endif
+
+            <a href="{{ route('pharmacist.edit', $order->or_id) }}" class="btn btn-warning text-dark fw-bold shadow-sm">
+                <i class="bi bi-pencil-square me-1"></i> แก้ไขคำสั่งยาเคมีบำบัด
+            </a>
+
+            <a href="{{ route('pharmacist.print.order', $order->or_id) }}" target="_blank" class="btn btn-info text-dark fw-semibold shadow-sm">
+                <i class="bi bi-file-earmark-medical-fill me-1"></i> พิมพ์ใบสั่งยา (A4)
+            </a>
+
+            <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold">
+                <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบจัดยา Working Formula (A5 แนวนอน)
+            </a>
+
+            <a href="{{ route('pharmacist.print.labels', $order->or_id) }}" target="_blank" class="btn btn-primary fw-semibold">
+                <i class="bi bi-tags-fill me-1"></i> พิมพ์ฉลากยาทั้งหมด
+            </a>
+
+            <button type="button" class="btn btn-outline-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                <i class="bi bi-x-octagon-fill me-1"></i> ยกเลิกคำสั่งใช้ยา
+            </button>
         @endif
-
-        <a href="{{ route('pharmacist.edit', $order->or_id) }}" class="btn btn-warning text-dark fw-bold shadow-sm">
-            <i class="bi bi-pencil-square me-1"></i> แก้ไขคำสั่งยาเคมีบำบัด
-        </a>
-
-        <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold">
-            <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบจัดยา Working Formula (A5 แนวนอน)
-        </a>
-
-        <a href="{{ route('pharmacist.print.labels', $order->or_id) }}" target="_blank" class="btn btn-primary fw-semibold">
-            <i class="bi bi-tags-fill me-1"></i> พิมพ์ฉลากยาทั้งหมด
-        </a>
 
         <a href="{{ route('pharmacist.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left me-1"></i> กลับหน้าหลักเภสัชกร
         </a>
     </div>
 </div>
+
+@if($isCancelled)
+    <div class="alert alert-danger border-danger d-flex align-items-center mb-4 shadow-sm">
+        <i class="bi bi-x-octagon-fill fs-3 me-3 text-danger"></i>
+        <div>
+            <div class="fw-bold fs-6">คำสั่งใช้ยานี้ถูกยกเลิกแล้ว (CANCELLED) &mdash; งดการเตรียมยาและส่งมอบ</div>
+            <div class="small mt-1">
+                <strong>ยกเลิกโดย:</strong> {{ $order->or_cancelled_by ?? '-' }} |
+                <strong>เวลาที่ยกเลิก:</strong> {{ $order->or_cancelled_at ? \Carbon\Carbon::parse($order->or_cancelled_at)->format('d/m/Y H:i น.') : '-' }}<br>
+                <strong>เหตุผลการยกเลิก:</strong> {{ $order->or_cancel_reason ?: '-' }}
+            </div>
+        </div>
+    </div>
+@endif
 
 <!-- ข้อมูลผู้ป่วยและสถานะ -->
 <div class="card card-medical bg-white mb-4">
@@ -83,7 +108,14 @@
                         สูตร Regimen: {{ $order->or_reg_code }} (Cycle #{{ $order->or_cycle ?? 1 }})
                     </span>
                 </div>
-                @if($order->or_confirm == 1)
+                @if($isCancelled)
+                    <span class="badge bg-danger px-3 py-2 fs-6">
+                        <i class="bi bi-x-octagon-fill me-1"></i> สถานะ: ยกเลิกแล้ว
+                    </span>
+                    <div class="small text-danger mt-1">
+                        {{ $order->or_cancelled_by ?? '-' }}
+                    </div>
+                @elseif($order->or_confirm == 1)
                     <span class="badge bg-success px-3 py-2 fs-6">
                         <i class="bi bi-check-circle-fill me-1"></i> สถานะ: รับคำสั่งแล้ว
                     </span>
@@ -482,6 +514,39 @@
         @endif
     </div>
 </div>
+@if(!$isCancelled)
+<!-- Modal ยืนยันการยกเลิกคำสั่งใช้ยา (เภสัชกร) -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <form method="POST" action="{{ route('pharmacist.cancel', $order->or_id) }}">
+                @csrf
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-x-octagon-fill me-2"></i>ยืนยันการยกเลิกคำสั่งใช้ยา (เภสัชกร)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small mb-3">
+                        <strong>เลขที่คำสั่ง:</strong> {{ $order->or_id }} | <strong>ผู้ป่วย:</strong> {{ $order->or_patname }} (HN: {{ $order->or_hn }})<br>
+                        ระบบจะ <strong>ไม่ลบข้อมูล</strong> แต่จะเปลี่ยนสถานะเป็น <strong>"ยกเลิกแล้ว"</strong> และระงับรายการจากสติกเกอร์รายวันและหน้าพยาบาลอัตโนมัติ
+                    </div>
+                    <label class="form-label fw-bold text-danger">เหตุผลการยกเลิกคำสั่งใช้ยา (เช่น หลังปรึกษาแพทย์) <span class="text-danger">*</span></label>
+                    <textarea name="cancel_reason" class="form-control" rows="3" required
+                              placeholder="ระบุเหตุผล เช่น ปรึกษาแพทย์แล้วขอยกเลิกคำสั่ง เนื่องจากผู้ป่วยเลื่อนรับยา / สั่งซ้ำ..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+                    <button type="submit" class="btn btn-danger fw-bold">
+                        <i class="bi bi-x-octagon-fill me-1"></i> ยืนยันยกเลิกคำสั่งใช้ยา
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('js_after')

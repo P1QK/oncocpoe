@@ -44,22 +44,61 @@ class DoctorController extends Controller
 
         if ($request->filled('status')) {
             if ($request->input('status') === 'pending') {
-                $query->where('or_confirm', 0);
+                $query->where('or_cancel', 0)->where('or_confirm', 0);
             } elseif ($request->input('status') === 'confirmed') {
-                $query->where('or_confirm', 1);
+                $query->where('or_cancel', 0)->where('or_confirm', 1);
+            } elseif ($request->input('status') === 'cancelled') {
+                $query->where('or_cancel', 1);
             }
         }
 
         $orders = $query->paginate(15)->withQueryString();
 
         $stats = [
-            'total'     => OrderHeader::whereDate('or_date', $selectedDate)->count(),
-            'pending'   => OrderHeader::whereDate('or_date', $selectedDate)->where('or_confirm', 0)->count(),
-            'confirmed' => OrderHeader::whereDate('or_date', $selectedDate)->where('or_confirm', 1)->count(),
-            'today'     => OrderHeader::whereDate('or_date', today())->count(),
+            'total'     => OrderHeader::whereDate('or_date', $selectedDate)->where('or_cancel', 0)->count(),
+            'pending'   => OrderHeader::whereDate('or_date', $selectedDate)->where('or_cancel', 0)->where('or_confirm', 0)->count(),
+            'confirmed' => OrderHeader::whereDate('or_date', $selectedDate)->where('or_cancel', 0)->where('or_confirm', 1)->count(),
+            'cancelled' => OrderHeader::whereDate('or_date', $selectedDate)->where('or_cancel', 1)->count(),
+            'today'     => OrderHeader::whereDate('or_date', today())->where('or_cancel', 0)->count(),
         ];
 
         return view('doctor.index', compact('orders', 'stats', 'selectedDate'));
+    }
+
+    /**
+     * แพทย์ยกเลิกคำสั่งใช้ยา (ไม่ลบข้อมูล เปลี่ยนสถานะเป็นยกเลิกเพื่อเก็บประวัติ Audit Trail)
+     */
+    public function cancel(Request $request, string $orId)
+    {
+        $order = OrderHeader::findOrFail($orId);
+
+        if ((int) $order->or_cancel === 1) {
+            return redirect()
+                ->route('doctor.show', $order->or_id)
+                ->with('success', 'คำสั่งใช้ยานี้ถูกยกเลิกไปแล้ว');
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:500'],
+        ], [
+            'cancel_reason.required' => 'กรุณาระบุเหตุผลการยกเลิกคำสั่งใช้ยา',
+        ]);
+
+        DB::transaction(function () use ($order, $validated) {
+            $order->update([
+                'or_cancel'        => 1,
+                'or_cancel_reason' => trim($validated['cancel_reason']),
+                'or_cancelled_by'  => '[แพทย์] ' . Auth::user()->name,
+                'or_cancelled_at'  => now(),
+            ]);
+
+            DB::table('order_d')->where('or_id', $order->or_id)->update(['or_discont' => 1]);
+            DB::table('onc_dayrecord')->where('or_id', $order->or_id)->update(['or_discont' => 1]);
+        });
+
+        return redirect()
+            ->route('doctor.show', $order->or_id)
+            ->with('success', 'ยกเลิกคำสั่งใช้ยาเลขที่ ' . $order->or_id . ' เรียบร้อยแล้ว (เก็บประวัติไว้ในระบบไม่ถูกลบ)');
     }
 
     public function create()

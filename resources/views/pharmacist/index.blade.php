@@ -83,6 +83,7 @@
                     <option value="">-- ทุกสถานะคำสั่ง --</option>
                     <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>รอรับคำสั่ง (Pending)</option>
                     <option value="confirmed" {{ request('status') === 'confirmed' ? 'selected' : '' }}>รับคำสั่งแล้ว (Confirmed)</option>
+                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>ยกเลิกแล้ว (Cancelled)</option>
                 </select>
             </div>
             <div class="col-md-2 d-flex gap-1">
@@ -111,9 +112,10 @@
             </thead>
             <tbody>
                 @forelse($orders as $order)
-                    <tr class="{{ $order->or_confirm == 0 ? 'table-warning' : '' }}">
+                    @php $isCancelled = (int) ($order->or_cancel ?? 0) === 1; @endphp
+                    <tr class="{{ $isCancelled ? 'table-danger opacity-75' : ($order->or_confirm == 0 ? 'table-warning' : '') }}">
                         <td>
-                            <div class="fw-bold text-dark">{{ $order->or_id }}</div>
+                            <div class="fw-bold {{ $isCancelled ? 'text-decoration-line-through text-danger' : 'text-dark' }}">{{ $order->or_id }}</div>
                             <small class="text-secondary"><i class="bi bi-calendar3 me-1"></i>เริ่ม: {{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}</small>
                         </td>
                         <td>
@@ -149,7 +151,14 @@
                             @endif
                         </td>
                         <td>
-                            @if($order->or_confirm == 1)
+                            @if($isCancelled)
+                                <span class="badge bg-danger px-2 py-1">
+                                    <i class="bi bi-x-octagon-fill me-1"></i>ยกเลิกแล้ว
+                                </span>
+                                @if($order->or_cancelled_by)
+                                    <small class="d-block text-danger mt-1">{{ $order->or_cancelled_by }}</small>
+                                @endif
+                            @elseif($order->or_confirm == 1)
                                 <span class="badge bg-success px-2 py-1">
                                     <i class="bi bi-check-circle-fill me-1"></i>รับคำสั่งแล้ว
                                 </span>
@@ -164,7 +173,7 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-1 flex-wrap">
-                                @if($order->or_confirm == 0)
+                                @if(!$isCancelled && $order->or_confirm == 0)
                                     <form method="POST" action="{{ route('pharmacist.confirm', $order->or_id) }}">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-success fw-semibold">
@@ -177,13 +186,15 @@
                                     <i class="bi bi-folder2-open me-1"></i> รายละเอียด
                                 </a>
 
-                                <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-sm btn-outline-dark" title="พิมพ์ใบจัดยา A5 แนวนอน">
-                                    <i class="bi bi-printer-fill me-1"></i> ใบจัดยา (A5)
-                                </a>
+                                @if(!$isCancelled)
+                                    <a href="{{ route('pharmacist.print.working-formula', $order->or_id) }}" target="_blank" class="btn btn-sm btn-outline-dark" title="พิมพ์ใบจัดยา A5 แนวนอน">
+                                        <i class="bi bi-printer-fill me-1"></i> ใบจัดยา (A5)
+                                    </a>
 
-                                <a href="{{ route('pharmacist.print.labels', $order->or_id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="พิมพ์ฉลากยาเคมีบำบัด">
-                                    <i class="bi bi-tag-fill me-1"></i> ฉลากยา
-                                </a>
+                                    <a href="{{ route('pharmacist.print.labels', $order->or_id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="พิมพ์ฉลากยาเคมีบำบัด">
+                                        <i class="bi bi-tag-fill me-1"></i> ฉลากยา
+                                    </a>
+                                @endif
                             </div>
                         </td>
                     </tr>

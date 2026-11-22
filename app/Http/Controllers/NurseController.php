@@ -26,6 +26,14 @@ class NurseController extends Controller
             'timing',
         ])
             ->whereDate('or_daterec', $selectedDate)
+            ->where(function ($q) {
+                $q->whereNull('or_discont')->orWhere('or_discont', 0);
+            })
+            ->whereHas('orderHeader', function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('or_cancel')->orWhere('or_cancel', 0);
+                });
+            })
             ->orderBy('or_id')
             ->orderBy('or_orderno');
 

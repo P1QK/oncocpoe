@@ -148,10 +148,10 @@
             <button type="button" onclick="window.print()" class="btn btn-primary fw-bold shadow-sm">
                 <i class="bi bi-printer-fill me-1"></i> สั่งพิมพ์ใบสั่งยา (A4)
             </button>
-            <a href="{{ route('doctor.show', $order->or_id) }}" class="btn btn-outline-secondary">
+            <a href="{{ $backUrl ?? route('doctor.show', $order->or_id) }}" class="btn btn-outline-secondary">
                 <i class="bi bi-eye me-1"></i> ดูหน้ารายละเอียด
             </a>
-            <a href="{{ route('doctor.index') }}" class="btn btn-outline-dark">
+            <a href="{{ $listUrl ?? route('doctor.index') }}" class="btn btn-outline-dark">
                 <i class="bi bi-arrow-left me-1"></i> กลับหน้ารายการ
             </a>
         </div>

@@ -3,17 +3,23 @@
 @section('title', 'รายละเอียดคำสั่งใช้ยา ' . $order->or_id)
 
 @section('content')
+@php $isCancelled = (int) ($order->or_cancel ?? 0) === 1; @endphp
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold text-primary mb-0">
+        <h4 class="fw-bold {{ $isCancelled ? 'text-danger text-decoration-line-through' : 'text-primary' }} mb-0">
             <i class="bi bi-file-medical-fill me-2"></i>ใบคำสั่งใช้ยาเคมีบำบัด เลขที่: {{ $order->or_id }}
         </h4>
         <small class="text-secondary">สั่งใช้โดย: {{ $order->or_doctor_name ?? 'แพทย์ผู้สั่งรักษา' }} | วันที่เริ่มให้ยา: {{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}</small>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold shadow-sm">
-            <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)
-        </a>
+        @if(!$isCancelled)
+            <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-dark fw-semibold shadow-sm">
+                <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)
+            </a>
+            <button type="button" class="btn btn-outline-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                <i class="bi bi-x-octagon-fill me-1"></i> ยกเลิกคำสั่งใช้ยา
+            </button>
+        @endif
         @if(auth()->user()->canAccessPharmacist())
             <a href="{{ route('pharmacist.show', $order->or_id) }}" class="btn btn-success fw-semibold">
                 <i class="bi bi-capsule me-1"></i> ไปที่หน้าตรวจสอบของเภสัชกร
@@ -24,6 +30,20 @@
         </a>
     </div>
 </div>
+
+@if($isCancelled)
+    <div class="alert alert-danger border-danger d-flex align-items-center mb-4 shadow-sm">
+        <i class="bi bi-x-octagon-fill fs-3 me-3 text-danger"></i>
+        <div>
+            <div class="fw-bold fs-6">คำสั่งใช้ยานี้ถูกยกเลิกแล้ว (CANCELLED) &mdash; ไม่มีการจัด/เตรียม/บริหารยา</div>
+            <div class="small mt-1">
+                <strong>ยกเลิกโดย:</strong> {{ $order->or_cancelled_by ?? '-' }} |
+                <strong>เวลาที่ยกเลิก:</strong> {{ $order->or_cancelled_at ? \Carbon\Carbon::parse($order->or_cancelled_at)->format('d/m/Y H:i น.') : '-' }}<br>
+                <strong>เหตุผลการยกเลิก:</strong> {{ $order->or_cancel_reason ?: '-' }}
+            </div>
+        </div>
+    </div>
+@endif
 
 <!-- ข้อมูลผู้ป่วยและสถานะ -->
 <div class="card card-medical bg-white mb-4">
@@ -59,7 +79,11 @@
                     <span class="badge bg-dark fs-6">{{ $order->or_reg_code }} (Cycle #{{ $order->or_cycle ?? 1 }})</span>
                 </div>
                 <div>
-                    @if($order->or_confirm == 1)
+                    @if($isCancelled)
+                        <span class="badge bg-danger px-3 py-2 fs-6">
+                            <i class="bi bi-x-octagon-fill me-1"></i> ยกเลิกคำสั่งใช้ยาแล้ว
+                        </span>
+                    @elseif($order->or_confirm == 1)
                         <span class="badge bg-success px-3 py-2 fs-6">
                             <i class="bi bi-check-circle-fill me-1"></i> เภสัชกรรับคำสั่งแล้ว
                         </span>
@@ -328,5 +352,38 @@
             </div>
         </div>
     </div>
+@endif
+@if(!$isCancelled)
+<!-- Modal ยืนยันการยกเลิกคำสั่งใช้ยา (แพทย์) -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <form method="POST" action="{{ route('doctor.cancel', $order->or_id) }}">
+                @csrf
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-x-octagon-fill me-2"></i>ยืนยันการยกเลิกคำสั่งใช้ยา
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small mb-3">
+                        <strong>เลขที่คำสั่ง:</strong> {{ $order->or_id }} | <strong>ผู้ป่วย:</strong> {{ $order->or_patname }} (HN: {{ $order->or_hn }})<br>
+                        ระบบจะ <strong>ไม่ลบข้อมูล</strong> แต่จะเปลี่ยนสถานะเป็น <strong>"ยกเลิกแล้ว"</strong> และระงับรายการจากหน้าเตรียมยา/พยาบาลอัตโนมัติ
+                    </div>
+                    <label class="form-label fw-bold text-danger">เหตุผลการยกเลิกคำสั่งใช้ยา <span class="text-danger">*</span></label>
+                    <textarea name="cancel_reason" class="form-control" rows="3" required
+                              placeholder="ระบุเหตุผล เช่น ผู้ป่วยมีไข้/ANC ต่ำ, เปลี่ยนแผนการรักษา, สั่งผิดสูตรยา..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+                    <button type="submit" class="btn btn-danger fw-bold">
+                        <i class="bi bi-x-octagon-fill me-1"></i> ยืนยันยกเลิกคำสั่งใช้ยา
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endif
 @endsection

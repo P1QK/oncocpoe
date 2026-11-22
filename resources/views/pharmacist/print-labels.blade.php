@@ -127,18 +127,28 @@
             border-top: 1px solid #cbd5e1;
             flex-shrink: 0;
         }
+        @page {
+            size: 9cm 7cm;
+            margin: 0;
+        }
         @media print {
-            body {
-                background: #fff;
-                margin: 0;
+            html, body {
+                width: 9cm !important;
+                height: 7cm !important;
+                background: #fff !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             .no-print {
                 display: none !important;
             }
             .labels-grid {
-                max-width: 100%;
-                margin: 0;
-                gap: 4mm;
+                display: block !important;
+                width: 9cm !important;
+                max-width: 9cm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                gap: 0 !important;
             }
             .chemo-label-card {
                 width: 9cm !important;
@@ -147,7 +157,17 @@
                 max-width: 9cm !important;
                 min-height: 7cm !important;
                 max-height: 7cm !important;
-                box-shadow: none;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                page-break-after: always;
+                break-after: page;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .chemo-label-card:last-child {
+                page-break-after: auto;
+                break-after: auto;
             }
         }
     </style>

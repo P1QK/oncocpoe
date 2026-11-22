@@ -42,9 +42,11 @@ class PharmacistController extends Controller
 
         if ($request->filled('status')) {
             if ($request->input('status') === 'pending') {
-                $query->where('or_confirm', 0);
+                $query->where('or_cancel', 0)->where('or_confirm', 0);
             } elseif ($request->input('status') === 'confirmed') {
-                $query->where('or_confirm', 1);
+                $query->where('or_cancel', 0)->where('or_confirm', 1);
+            } elseif ($request->input('status') === 'cancelled') {
+                $query->where('or_cancel', 1);
             }
         }
 
@@ -54,6 +56,42 @@ class PharmacistController extends Controller
         $latestToken = $this->getStateToken($selectedDate);
 
         return view('pharmacist.index', compact('orders', 'stats', 'latestToken', 'selectedDate'));
+    }
+
+    /**
+     * เภสัชกรยกเลิกคำสั่งใช้ยา (ไม่ลบข้อมูล เปลี่ยนสถานะเป็นยกเลิกเพื่อเก็บประวัติ Audit Trail)
+     */
+    public function cancel(Request $request, string $orId)
+    {
+        $order = OrderHeader::findOrFail($orId);
+
+        if ((int) $order->or_cancel === 1) {
+            return redirect()
+                ->route('pharmacist.show', $order->or_id)
+                ->with('success', 'คำสั่งใช้ยานี้ถูกยกเลิกไปแล้ว');
+        }
+
+        $validated = $request->validate([
+            'cancel_reason' => ['required', 'string', 'max:500'],
+        ], [
+            'cancel_reason.required' => 'กรุณาระบุเหตุผลการยกเลิกคำสั่งใช้ยา',
+        ]);
+
+        DB::transaction(function () use ($order, $validated) {
+            $order->update([
+                'or_cancel'        => 1,
+                'or_cancel_reason' => trim($validated['cancel_reason']),
+                'or_cancelled_by'  => '[เภสัชกร] ' . Auth::user()->name,
+                'or_cancelled_at'  => now(),
+            ]);
+
+            DB::table('order_d')->where('or_id', $order->or_id)->update(['or_discont' => 1]);
+            DB::table('onc_dayrecord')->where('or_id', $order->or_id)->update(['or_discont' => 1]);
+        });
+
+        return redirect()
+            ->route('pharmacist.show', $order->or_id)
+            ->with('success', 'ยกเลิกคำสั่งใช้ยาเลขที่ ' . $order->or_id . ' เรียบร้อยแล้ว (เก็บประวัติไว้ในระบบไม่ถูกลบ)');
     }
 
     /**
@@ -75,10 +113,11 @@ class PharmacistController extends Controller
         $date = $selectedDate ?: today()->format('Y-m-d');
 
         return [
-            'total'       => OrderHeader::whereDate('or_date', $date)->count(),
-            'pending'     => OrderHeader::whereDate('or_date', $date)->where('or_confirm', 0)->count(),
-            'confirmed'   => OrderHeader::whereDate('or_date', $date)->where('or_confirm', 1)->count(),
-            'today_doses' => OncDayRecord::whereDate('or_daterec', $date)->count(),
+            'total'       => OrderHeader::whereDate('or_date', $date)->where('or_cancel', 0)->count(),
+            'pending'     => OrderHeader::whereDate('or_date', $date)->where('or_cancel', 0)->where('or_confirm', 0)->count(),
+            'confirmed'   => OrderHeader::whereDate('or_date', $date)->where('or_cancel', 0)->where('or_confirm', 1)->count(),
+            'cancelled'   => OrderHeader::whereDate('or_date', $date)->where('or_cancel', 1)->count(),
+            'today_doses' => OncDayRecord::whereDate('or_daterec', $date)->where(fn ($q) => $q->whereNull('or_discont')->orWhere('or_discont', 0))->count(),
         ];
     }
 
@@ -86,9 +125,10 @@ class PharmacistController extends Controller
     {
         $date = $selectedDate ?: today()->format('Y-m-d');
         $count = OrderHeader::whereDate('or_date', $date)->count();
-        $pending = OrderHeader::whereDate('or_date', $date)->where('or_confirm', 0)->count();
+        $pending = OrderHeader::whereDate('or_date', $date)->where('or_cancel', 0)->where('or_confirm', 0)->count();
+        $cancelled = OrderHeader::whereDate('or_date', $date)->where('or_cancel', 1)->count();
         $latestId = OrderHeader::whereDate('or_date', $date)->orderByDesc('or_id')->value('or_id') ?? 'none';
-        return md5("{$date}|{$count}|{$pending}|{$latestId}");
+        return md5("{$date}|{$count}|{$pending}|{$cancelled}|{$latestId}");
     }
 
     public function show(string $orId)
@@ -533,6 +573,28 @@ class PharmacistController extends Controller
     }
 
     /**
+     * พิมพ์ใบสั่งยาเคมีบำบัดเต็มรูปแบบ (ขนาด A4 แนวตั้ง — ใช้รูปแบบเดียวกับหน้าแพทย์)
+     */
+    public function printOrder(string $orId)
+    {
+        $order = OrderHeader::with([
+            'details.medication',
+            'details.unit',
+            'details.solution',
+            'details.route',
+            'details.timing',
+            'supportiveMeds',
+            'ward',
+        ])->findOrFail($orId);
+
+        return view('doctor.print-order', [
+            'order'   => $order,
+            'backUrl' => route('pharmacist.show', $order->or_id),
+            'listUrl' => route('pharmacist.index'),
+        ]);
+    }
+
+    /**
      * พิมพ์ใบจัดยา (Working Formula) ขนาด A5 แนวนอน
      */
     public function workingFormula(string $orId)
@@ -646,6 +708,8 @@ class PharmacistController extends Controller
             'timing',
         ])
             ->whereDate('or_daterec', $selectedDate)
+            ->where(fn ($q) => $q->whereNull('or_discont')->orWhere('or_discont', 0))
+            ->whereHas('orderHeader', fn ($q) => $q->where('or_cancel', 0))
             ->orderBy('or_id')
             ->orderBy('or_orderno')
             ->get();
@@ -661,6 +725,7 @@ class PharmacistController extends Controller
             'details.timing',
             'ward',
         ])
+            ->where('or_cancel', 0)
             ->whereNotIn('or_id', $existingOrIds)
             ->whereHas('details', function ($q) use ($selectedDate) {
                 $q->whereDate('or_start', '<=', $selectedDate)

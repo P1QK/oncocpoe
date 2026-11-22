@@ -76,6 +76,7 @@
                     <option value="">-- ทุกสถานะคำสั่ง --</option>
                     <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>รอเภสัชกรรับคำสั่ง</option>
                     <option value="confirmed" {{ request('status') === 'confirmed' ? 'selected' : '' }}>รับคำสั่งแล้ว</option>
+                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>ยกเลิกแล้ว</option>
                 </select>
             </div>
             <div class="col-md-2 d-flex gap-1">
@@ -104,9 +105,10 @@
             </thead>
             <tbody>
                 @forelse($orders as $order)
-                    <tr>
+                    @php $isCancelled = (int) ($order->or_cancel ?? 0) === 1; @endphp
+                    <tr class="{{ $isCancelled ? 'table-danger opacity-75' : '' }}">
                         <td>
-                            <div class="fw-bold text-primary">{{ $order->or_id }}</div>
+                            <div class="fw-bold {{ $isCancelled ? 'text-decoration-line-through text-danger' : 'text-primary' }}">{{ $order->or_id }}</div>
                             <small class="text-secondary"><i class="bi bi-calendar3 me-1"></i>{{ \Carbon\Carbon::parse($order->or_date)->format('d/m/Y') }}</small>
                         </td>
                         <td>
@@ -151,7 +153,14 @@
                             @endif
                         </td>
                         <td>
-                            @if($order->or_confirm == 1)
+                            @if($isCancelled)
+                                <span class="badge bg-danger px-2 py-1">
+                                    <i class="bi bi-x-octagon-fill me-1"></i>ยกเลิกแล้ว
+                                </span>
+                                @if($order->or_cancelled_by)
+                                    <div class="small text-danger mt-1">{{ $order->or_cancelled_by }}</div>
+                                @endif
+                            @elseif($order->or_confirm == 1)
                                 <span class="badge bg-success px-2 py-1">
                                     <i class="bi bi-check-circle-fill me-1"></i>รับคำสั่งแล้ว
                                 </span>
@@ -166,9 +175,11 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-1 flex-wrap">
-                                <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-sm btn-dark fw-semibold" title="พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)">
-                                    <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยา
-                                </a>
+                                @if(!$isCancelled)
+                                    <a href="{{ route('doctor.print', $order->or_id) }}" target="_blank" class="btn btn-sm btn-dark fw-semibold" title="พิมพ์ใบสั่งยาเต็มรูปแบบ (A4)">
+                                        <i class="bi bi-printer-fill me-1"></i> พิมพ์ใบสั่งยา
+                                    </a>
+                                @endif
                                 <a href="{{ route('doctor.show', $order->or_id) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye-fill me-1"></i> ดูใบสั่งยา
                                 </a>
